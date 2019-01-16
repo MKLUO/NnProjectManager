@@ -8,7 +8,7 @@ namespace NnManager {
 
         class NnTask {
 
-            enum Status {
+            public enum Status {
                 New,
                 Done,
                 Error
@@ -23,14 +23,35 @@ namespace NnManager {
                 }
 
             public void RunAsync() {
-                status = Status.Done;
+                // TODO: switch status
+
+                if (task != null) return;
+
+                task = new Task(
+                    () => Run()
+                );
+
+                task.Start();
             }
 
             // Time comsuming!
-            public void Run() {
+            // TODO: Parse for NN output
+            // TODO: Thread-safe execution of NN.
+            void Run() {
+                // switch: status
+
+                // TODO: Directory is initialized in template? (must be unique)
+
+                // TODO: For testing:
+                Thread.Sleep(10000);
+
                 status = Status.Done;
             }
 
+            public Status GetStatus() {
+                return status;
+            }
+            
             readonly string content;
 
             Task task;

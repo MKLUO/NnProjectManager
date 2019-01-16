@@ -1,4 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
+
+using NnManager;
 
 namespace nnProjectManager
 {
@@ -6,7 +9,25 @@ namespace nnProjectManager
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
+            Project projTest = Project.New("Test");            
+
+            projTest.AddTemplate(
+                "Temp01", 
+                ""
+            );
+
+            projTest.AddTask(
+                "Task01",
+                "Temp01",        
+                new Dictionary<string, string>        
+                {
+                    {"What", "Yup"}
+                }
+            );
+
+            projTest.LaunchAllTask();
+
+            projTest.WaitForAllTask();
         }
     }
 }
