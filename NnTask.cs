@@ -41,8 +41,12 @@ namespace NnManager {
                 task.Start();
             }
 
-            public Status GetStatus() {
+            public Status GetNnTaskStatus() {
                 return status;
+            }
+
+            public TaskStatus GetTaskStatus() {
+                return task.Status;
             }
 
             readonly string name;
