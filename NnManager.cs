@@ -1,42 +1,8 @@
 using System.Collections.Generic;
 
 namespace NnManager {
-    public class Project {
 
-        class Template {
-
-            public Template(
-                string content
-            ) {
-
-            }
-            public string generateContent() {
-                return "";
-            }
-        }
-
-        class Task {
-
-            enum Status {
-                New,
-                Done,
-                Error
-            };
-
-            public Task(
-                string content_) {
-                    content = content_;
-                    status = Status.New;
-                }
-
-            public void Run() {
-                status = Status.Done;
-            }
-
-            readonly string content;
-
-            Status status;
-        }
+    public partial class Project {
 
         public Project(
             string name_) {
@@ -55,11 +21,11 @@ namespace NnManager {
         public void AddTask(
             string name,
             string templateId,
-            string param) {
+            Dictionary<string, string> param) {
             tasks.Add(
                 name,
-                new Task(
-                    templates[templateId].gene)
+                new NnTask(
+                    templates[templateId].generateContent(param))
             );
         }
 
@@ -73,7 +39,7 @@ namespace NnManager {
 
         readonly string name;
 
-        Dictionary<string, Template>    templates;
-        Dictionary<string, Task>        tasks;
+        Dictionary<string, Template> templates;
+        Dictionary<string, NnTask> tasks;
     }
 }
