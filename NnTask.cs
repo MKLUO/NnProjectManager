@@ -8,6 +8,8 @@ namespace NnManager {
 
         class NnTask {
 
+            // TODO: All File system related operations should be encapsulated here.
+
             public enum Status {
                 New,
                 Done,
@@ -15,43 +17,35 @@ namespace NnManager {
             };
 
             public NnTask(
-                string content_) {
-                    content = content_;
+                string name,
+                string content) {
+                    // TODO: Check if name is unique
+                    this.name = name;
+                    this.content = content;
 
                     task = null;
                     status = Status.New;
                 }
 
-            public void RunAsync() {
+            public void Launch() {
                 // TODO: switch status
 
                 if (task != null) return;
 
+                // TODO: generate input file and directory
+
                 task = new Task(
-                    () => Run()
+                    () => Utilities.NnAgent.RunNn(name)
                 );
 
                 task.Start();
             }
 
-            // Time comsuming!
-            // TODO: Parse for NN output
-            // TODO: Thread-safe execution of NN.
-            void Run() {
-                // switch: status
-
-                // TODO: Directory is initialized in template? (must be unique)
-
-                // TODO: For testing:
-                Thread.Sleep(10000);
-
-                status = Status.Done;
-            }
-
             public Status GetStatus() {
                 return status;
             }
-            
+
+            readonly string name;
             readonly string content;
 
             Task task;

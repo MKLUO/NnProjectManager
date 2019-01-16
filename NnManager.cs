@@ -29,15 +29,15 @@ namespace NnManager {
             string templateId,
             Dictionary<string, string> param) {
             tasks.Add(
-                name,
                 new NnTask(
+                    name,
                     templates[templateId].generateContent(param))
             );
         }
 
         public void LaunchAllTask() {
             foreach (var pair in tasks)
-                pair.Value.RunAsync();
+                pair.Value.Launch();
         }
 
         // For testing
@@ -79,6 +79,6 @@ namespace NnManager {
         readonly string name;
 
         Dictionary<string, Template> templates;
-        Dictionary<string, NnTask> tasks;
+        List<NnTask> tasks;
     }
 }
