@@ -2,6 +2,10 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
+using System.Collections.Generic;
+
+using Utilities;
+
 namespace NnManager {
 
     public partial class Project {
@@ -12,43 +16,79 @@ namespace NnManager {
 
             public enum Status {
                 New,
+                Running,
                 Done,
                 Error
             };
 
+            // New Task
             public NnTask(
+                string name,
                 string content) {
+                    this.name = name;
                     this.content = content;
-                    this.id = Utilities.Util.RandomString(20);
 
-                    task = null;
-                    status = Status.New;
+                    this.outputHash = null;
+
+                    this.task = null;
+                    this.status = Status.New;
                 }
 
-            public void Launch() {
-                // TODO: switch status
+            // Check for integrity
+            public bool IsIntegrited() {
+                // TODO: check output existance/integrity accoding to id 
+                // TODO: if corrupted or output is missing, reset it
 
-                if (task != null) return;
+                return true;
+            }
+
+            public void Reset() {
+
+            }
+
+            public void Launch(
+                string path
+            ) {
+                // TODO: switch status
+                if (status == Status.Running) return;
+
+                status = Status.Running;
 
                 // TODO: generate input file and directory
+                // TODO: verify path
+
+                NnAgent.InitNnFolder(path, content);
 
                 task = new Task(
-                    () => Utilities.NnAgent.RunNn(id)
+                    () => {
+                        Utilities.NnAgent.RunNn(path);
+                        AfterRun(path);
+                    }
                 );
 
                 task.Start();
             }
 
-            public Status GetNnTaskStatus() {
+            public void KillTask() {
+                // TODO: 
+            }
+
+            void AfterRun(
+                string path
+            ) {
+                // TODO: parse log to look for errors
+                status = Status.Done;
+                outputHash = Util.HashPath(path);
+            }
+
+            public Status GetStatus() {
                 return status;
             }
-
-            public TaskStatus GetTaskStatus() {
-                return task.Status;
-            }
-
+            
+            readonly string name;
             readonly string content;
-            readonly string id;
+
+            string outputHash;
 
             Task task;
             Status status;

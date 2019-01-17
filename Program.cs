@@ -9,7 +9,7 @@ namespace nnProjectManager
     {
         static void Main(string[] args)
         {
-            Project projTest = Project.New("Test");            
+            Project projTest = new Project();            
 
             projTest.AddTemplate(
                 "Temp01", 

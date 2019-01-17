@@ -3,16 +3,26 @@ using System.Collections.Generic;
 
 using System.Threading;
 
+using Utilities;
+
 namespace NnManager {
 
     public partial class Project {
 
-        Project(
-            string name_ = "") {
-
-            name = name_;
+        // New Project
+        public Project() {
             templates = new Dictionary<string, Template>();
             tasks = new Dictionary<string, NnTask>();
+        }
+
+        // Loaded Project
+        public Project(
+            string rootPath) {
+            this.rootPath = rootPath;    
+            this.templates = (Dictionary<string, Template>)Util.DeserializeFromFile(
+                rootPath + "\\templates");
+            this.tasks = (Dictionary<string, NnTask>)Util.DeserializeFromFile(
+                rootPath + "\\tasks");            
         }
 
         public void AddTemplate(
@@ -27,18 +37,28 @@ namespace NnManager {
         public void AddTask(
             string name,
             string templateId,
-            Dictionary<string, string> param) {
+            Dictionary<string, string> param
+        ){
+            string id;
+            do {
+                id = Utilities.Util.RandomString(20);
+            } while (tasks.ContainsKey(id));
+            
             tasks.Add(
-                name,
+                id,
                 new NnTask(
+                    name,
                     templates[templateId].generateContent(param))
             );
         }
 
         // For testing
         public void LaunchAllTask() {
-            foreach (var pair in tasks)
-                pair.Value.Launch();
+            foreach (var pair in tasks) {
+                string id = pair.Key;
+                NnTask task = pair.Value;
+                pair.Value.Launch(Util.SubFolder(rootPath, id));
+            }
         }
 
         // For testing
@@ -62,22 +82,12 @@ namespace NnManager {
             Console.WriteLine("All tasks done!");
         }
 
-        static public Project New(
-            string name = ""
-        ) {
-            return new Project(name);
+        public void Save(string filePath) {                        
+            // TODO: Serialize
+            Util.SerializeToFile(this, filePath);
         }
 
-        static public Project Load() {
-            // TODO:
-            return new Project();
-        }
-
-        public void Save() {                        
-            // TODO:
-        }
-
-        readonly string name;
+        readonly string rootPath;
 
         Dictionary<string, Template> templates;
         Dictionary<string, NnTask> tasks;
