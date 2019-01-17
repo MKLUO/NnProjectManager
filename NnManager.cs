@@ -9,20 +9,24 @@ namespace NnManager {
 
     public partial class Project {
 
-        // New Project
-        public Project() {
-            templates = new Dictionary<string, Template>();
-            tasks = new Dictionary<string, NnTask>();
-        }
-
         // Loaded Project
         public Project(
-            string rootPath) {
+            string rootPath,
+            bool load = false) {
             this.rootPath = rootPath;    
-            this.templates = (Dictionary<string, Template>)Util.DeserializeFromFile(
-                rootPath + "\\templates");
-            this.tasks = (Dictionary<string, NnTask>)Util.DeserializeFromFile(
-                rootPath + "\\tasks");            
+            if (load) {
+                this.templates = (Dictionary<string, Template>)
+                    Util.DeserializeFromFile(
+                        Util.SubPath(rootPath, "\\templates"));
+                this.tasks = (Dictionary<string, NnTask>)
+                    Util.DeserializeFromFile(
+                        Util.SubPath(rootPath, "\\tasks"));            
+            } else {
+                this.templates = 
+                    new Dictionary<string, Template>();
+                this.tasks = 
+                    new Dictionary<string, NnTask>();
+            }
         }
 
         public void AddTemplate(
@@ -57,7 +61,7 @@ namespace NnManager {
             foreach (var pair in tasks) {
                 string id = pair.Key;
                 NnTask task = pair.Value;
-                pair.Value.Launch(Util.SubFolder(rootPath, id));
+                task.Launch(Util.SubPath(rootPath, id));
             }
         }
 
@@ -82,9 +86,14 @@ namespace NnManager {
             Console.WriteLine("All tasks done!");
         }
 
-        public void Save(string filePath) {                        
+        public void Save() {                        
             // TODO: Serialize
-            Util.SerializeToFile(this, filePath);
+            Util.SerializeToFile(
+                templates,
+                Util.SubPath(rootPath, "\\templates"));  
+            Util.SerializeToFile(
+                tasks,
+                Util.SubPath(rootPath, "\\tasks"));  
         }
 
         readonly string rootPath;

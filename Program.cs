@@ -9,25 +9,38 @@ namespace nnProjectManager
     {
         static void Main(string[] args)
         {
-            Project projTest = new Project();            
-
-            projTest.AddTemplate(
-                "Temp01", 
-                ""
+            Project projLoad = new Project(
+                "C:\\Users\\MKLUO\\Documents\\NNTEST",
+                load: true
             );
 
-            projTest.AddTask(
-                "Task01",
-                "Temp01",        
-                new Dictionary<string, string>        
-                {
-                    {"What", "Yup"}
-                }
-            );
+            projLoad.LaunchAllTask();
+            projLoad.WaitForAllTask();
 
-            projTest.LaunchAllTask();
+            projLoad.Save();
 
-            projTest.WaitForAllTask();
+            // Project projTest = new Project();            
+
+            // projTest.AddTemplate(
+            //     "Temp01", 
+            //     ""
+            // );
+
+            // projTest.AddTask(
+            //     "Task01",
+            //     "Temp01",        
+            //     new Dictionary<string, string>        
+            //     {
+            //         {"What", "Yup"}
+            //     }
+            // );
+
+            // projTest.Save(
+            //     "C:\\Users\\MKLUO\\Documents\\NNTEST"
+            // );
+
+            // projTest.LaunchAllTask();
+            // projTest.WaitForAllTask();
         }
     }
 }

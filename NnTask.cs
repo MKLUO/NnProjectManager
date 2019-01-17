@@ -4,12 +4,15 @@ using System.Threading.Tasks;
 
 using System.Collections.Generic;
 
+using System.Runtime.Serialization;
+
 using Utilities;
 
 namespace NnManager {
 
     public partial class Project {
 
+        [Serializable]
         class NnTask {
 
             // TODO: All File system related operations should be encapsulated here.
@@ -90,7 +93,9 @@ namespace NnManager {
 
             string outputHash;
 
+            [NonSerialized]
             Task task;
+
             Status status;
         }
 

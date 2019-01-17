@@ -1,7 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+
+using System.Runtime.Serialization;
+using System.Runtime.Serialization.Formatters.Binary;
 
 namespace Utilities
 {
@@ -63,19 +67,25 @@ namespace Utilities
             return path;
         }
 
-        public static string SubFolder(string root, string folder) {
+        public static string SubPath(string root, string path) {
             // TODO: 
-            return "";
+            return root + "\\" + path;
         }
 
         public static void SerializeToFile(Object obj, string filePath) {
-            // TODO: 
-
+            // TODO: File mode?
+            using (Stream stream = File.Open(filePath, FileMode.Create)) {
+                BinaryFormatter formatter = new BinaryFormatter();
+                formatter.Serialize(stream, obj);
+            }
         }
 
         public static Object DeserializeFromFile(string filePath) {
             // TODO: 
-            return new Object();
+            using (Stream stream = File.Open(filePath, FileMode.Open)) {
+                BinaryFormatter formatter = new BinaryFormatter();
+                return formatter.Deserialize(stream);
+            }
         }
     }
 }
