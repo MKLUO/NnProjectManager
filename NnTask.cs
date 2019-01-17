@@ -17,11 +17,9 @@ namespace NnManager {
             };
 
             public NnTask(
-                string name,
                 string content) {
-                    // TODO: Check if name is unique
-                    this.name = name;
                     this.content = content;
+                    this.id = Utilities.Util.RandomString(20);
 
                     task = null;
                     status = Status.New;
@@ -35,7 +33,7 @@ namespace NnManager {
                 // TODO: generate input file and directory
 
                 task = new Task(
-                    () => Utilities.NnAgent.RunNn(name)
+                    () => Utilities.NnAgent.RunNn(id)
                 );
 
                 task.Start();
@@ -49,8 +47,8 @@ namespace NnManager {
                 return task.Status;
             }
 
-            readonly string name;
             readonly string content;
+            readonly string id;
 
             Task task;
             Status status;
