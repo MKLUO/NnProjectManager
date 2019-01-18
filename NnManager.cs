@@ -11,22 +11,32 @@ namespace NnManager {
 
         // Loaded Project
         public Project(
-            string rootPath,
+            string path,
             bool load = false) {
-            this.rootPath = rootPath;    
+
+            // TODO: Handle exception according to load
+
+            this.path = path;    
             if (load) {
-                this.templates = (Dictionary<string, Template>)
-                    Util.DeserializeFromFile(
-                        Util.SubPath(rootPath, "\\templates"));
-                this.tasks = (Dictionary<string, NnTask>)
-                    Util.DeserializeFromFile(
-                        Util.SubPath(rootPath, "\\tasks"));            
+                var projData = 
+                    (KeyValuePair<
+                        Dictionary<string, Template>, 
+                        Dictionary<string, NnTask>
+                    >)Util.DeserializeFromFile(path);
+                this.templates  = projData.Key;
+                this.tasks      = projData.Value;
             } else {
                 this.templates = 
                     new Dictionary<string, Template>();
                 this.tasks = 
                     new Dictionary<string, NnTask>();
             }
+        }
+
+        public void SetOutputPath(
+            string path
+        ) {
+            outputPath = path;
         }
 
         public void AddTemplate(
@@ -61,7 +71,8 @@ namespace NnManager {
             foreach (var pair in tasks) {
                 string id = pair.Key;
                 NnTask task = pair.Value;
-                task.Launch(Util.SubPath(rootPath, id));
+                // task.Launch(Util.SubPath(rootPath, id));
+                task.Launch(outputPath);
             }
         }
 
@@ -89,14 +100,15 @@ namespace NnManager {
         public void Save() {                        
             // TODO: Serialize
             Util.SerializeToFile(
-                templates,
-                Util.SubPath(rootPath, "\\templates"));  
-            Util.SerializeToFile(
-                tasks,
-                Util.SubPath(rootPath, "\\tasks"));  
+                new KeyValuePair<
+                        Dictionary<string, Template>, 
+                        Dictionary<string, NnTask>
+                    >(templates, tasks),
+                path);  
         }
 
-        readonly string rootPath;
+        readonly string path;
+        string outputPath;
 
         Dictionary<string, Template> templates;
         Dictionary<string, NnTask> tasks;

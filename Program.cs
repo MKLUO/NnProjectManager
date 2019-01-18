@@ -9,38 +9,42 @@ namespace nnProjectManager
     {
         static void Main(string[] args)
         {
-            Project projLoad = new Project(
-                "C:\\Users\\MKLUO\\Documents\\NNTEST",
-                load: true
+            // Project projLoad = new Project(
+            //     "C:\\Users\\MKLUO\\Documents\\NNTEST\\test.nnproj",
+            //     load: true
+            // );
+
+            // projLoad.LaunchAllTask();
+            // projLoad.WaitForAllTask();
+
+            // projLoad.Save();
+
+            Project projTest = new Project(
+                "C:\\Users\\MKLUO\\Documents\\NNTEST\\test.nnproj"
+            );            
+
+            projTest.SetOutputPath(
+                "C:\\Users\\MKLUO\\Documents\\NNTEST"
             );
 
-            projLoad.LaunchAllTask();
-            projLoad.WaitForAllTask();
+            projTest.AddTemplate(
+                "Temp01", 
+                "\n\n\r\n @define   \t\t\tkkk_kk 1234sdasd__\n\n\n\n123123 @kkk_kk \t\t \t\t 1312 123"
+            );
 
-            projLoad.Save();
+            projTest.AddTask(
+                "Task01",
+                "Temp01",        
+                new Dictionary<string, string>        
+                {
+                    {"What", "Yup"}
+                }
+            );
 
-            // Project projTest = new Project();            
-
-            // projTest.AddTemplate(
-            //     "Temp01", 
-            //     ""
-            // );
-
-            // projTest.AddTask(
-            //     "Task01",
-            //     "Temp01",        
-            //     new Dictionary<string, string>        
-            //     {
-            //         {"What", "Yup"}
-            //     }
-            // );
-
-            // projTest.Save(
-            //     "C:\\Users\\MKLUO\\Documents\\NNTEST"
-            // );
-
-            // projTest.LaunchAllTask();
-            // projTest.WaitForAllTask();
+            projTest.LaunchAllTask();
+            projTest.WaitForAllTask();
+            
+            projTest.Save();
         }
     }
 }
