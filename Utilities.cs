@@ -12,10 +12,26 @@ namespace Utilities
     public static class NnAgent {
 
         // TODO: Check for NN exe
-        static string nnMainPath = "C:\\Program Files (x86)\\nextnano\\2015_08_19\\";
+        static string nnMainPath = @"C:\Program Files (x86)\nextnano\2015_08_19\";
 
         public static void InitNnFolder(string path, string content) {
             // TODO: 
+
+        }
+
+        public static void CheckNn(string path) {
+            try {
+                Util.StartAndWaitProcess(
+                    nnMainPath + @"nextnano++\bin 64bit\nextnano++_Intel_64bit.exe",
+                    " --license \""    + nnMainPath + "License\\license.txt\"" +
+                    " --database \""   + nnMainPath + "nextnano++\\Syntax\\database_nnp.in\"" +
+                    " --outputdirectory \"" + path + "\"" +
+                    " --noautooutdir -log -s \"" + path + "\\input.in\""
+                );
+                //System.Threading.Thread.Sleep(10000);
+            } catch {
+                throw new System.Exception("Exception encountered in RunNn (NnAgent)!");
+            }
         }
 
         public static void RunNn(string path) {
@@ -25,20 +41,14 @@ namespace Utilities
             // TODO: Path check (check for safety!)
 
             try {
-                // using (Process process = new Process()) {
-                //     process.StartInfo.FileName = 
-                //         nnMainPath + "nextnano++\\bin 64bit\\nextnano++_Intel_64bit.exe";
-                //     process.StartInfo.Arguments = 
-                //         " --license \""    + nnMainPath + "License\\license.txt\"" +
-                //         " --database \""   + nnMainPath + "nextnano++\\Syntax\\database_nnp.in\"" +
-                //         " --outputdirectory \"" + path + "\"" +
-                //         " --noautooutdir \"" + path + "\\input.in\"";
-                //     process.StartInfo.UseShellExecute = false;
-
-                //     process.Start();
-                //     process.WaitForExit();
-                // }
-                System.Threading.Thread.Sleep(10000);
+                Util.StartAndWaitProcess(
+                    nnMainPath + "nextnano++\\bin 64bit\\nextnano++_Intel_64bit.exe",
+                    " --license \""    + nnMainPath + "License\\license.txt\"" +
+                    " --database \""   + nnMainPath + "nextnano++\\Syntax\\database_nnp.in\"" +
+                    " --outputdirectory \"" + path + "\"" +
+                    " --noautooutdir -log \"" + path + "\\input.in\""
+                );
+                //System.Threading.Thread.Sleep(10000);
             } catch {
                 throw new System.Exception("Exception encountered in RunNn (NnAgent)!");
             }
@@ -46,6 +56,17 @@ namespace Utilities
     }
 
     public static class Util {
+
+        public static void StartAndWaitProcess(string fileName, string arguments) {
+            using (Process process = new Process()) {
+                process.StartInfo.FileName = fileName;
+                process.StartInfo.Arguments = arguments;
+                process.StartInfo.UseShellExecute = false;
+
+                process.Start();
+                process.WaitForExit();
+            }
+        }
 
         public static string RandomString(int length)
         {
@@ -62,15 +83,15 @@ namespace Utilities
             return "";
         }
 
-        public static string Path(string path) {
-            // TODO: verify path (make sure it is safe?)
-            return path;
-        }
+        // public static string Path(string path) {
+        //     // TODO: verify path (make sure it is safe?)
+        //     return path;
+        // }
 
-        public static string SubPath(string root, string path) {
-            // TODO: 
-            return root + "\\" + path;
-        }
+        // public static string SubPath(string root, string path) {
+        //     // TODO: 
+        //     return root + "\\" + path;
+        // }
 
         public static void SerializeToFile(Object obj, string filePath) {
             // TODO: File mode?

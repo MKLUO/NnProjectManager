@@ -28,20 +28,8 @@ namespace NnManager {
                     this.name = name;
                 }
 
-                readonly Type type;
-                readonly string name;
-            }
-
-            class Variable {
-                public Variable(
-                    string name,
-                    string defaultValue
-                ) {
-                    this.name = name;
-                    this.defaultValue = defaultValue;
-                }
-                readonly string name;
-                readonly string defaultValue;
+                readonly public Type type;
+                readonly public string name;
             }
 
             public Template(
@@ -49,12 +37,13 @@ namespace NnManager {
             ) {
                 // TODO: Parse for template
                 elements = new List<Element>();
-                variables = new List<Variable>();
+                variables = new Dictionary<string, string>();
 
                 string[] lines = 
                     Regex.Split(content, ("([\r\n|\r|\n]+)"))
                         .Where(s => s != String.Empty)
                         .ToArray<string>();
+
                 foreach(string line in lines) {
                     if (Regex.IsMatch(line, "[ |\t]*@define[ |\t]+[0-9|A-Z|a-z|_]+[ |\t]+[0-9|A-Z|a-z|_|\"]+[ |\t]*"
                     )) {
@@ -64,10 +53,8 @@ namespace NnManager {
                                 .ToArray<string>();
 
                         variables.Add(
-                            new Variable(
                                 tokens[1],
-                                tokens[2]
-                            ));
+                                tokens[2]);
                     } else {
                         string[] tokens = 
                             Regex.Split(line, "(@[0-9|A-Z|a-z|_]+)")
@@ -98,11 +85,44 @@ namespace NnManager {
 
             public string generateContent(
                 Dictionary<string, string> param) {
-                return "";
+                string result = "";
+
+                // Check if any param is not used
+                Dictionary<string, bool> paramCheck
+                    = new Dictionary<string, bool>();
+                foreach (var item in param)
+                    paramCheck.Add(item.Key, false);
+
+                foreach (Element element in elements)
+                {
+                    switch (element.type) {
+                        case Element.Type.Text:
+                            result += element.name;
+                            break;
+                        case Element.Type.Value:
+                            if (param.ContainsKey(element.name)){
+                                result += param[element.name];
+                                paramCheck[element.name] = true;
+                            }
+                            else if (variables.ContainsKey(element.name))
+                                result += variables[element.name];
+                            else
+                                throw new Exception("Variable missing.");
+
+                            // TODO: Implement custom exception
+                            break;
+                    }
+                }
+
+                foreach (var item in paramCheck)
+                    if (item.Value == false)
+                        throw new Exception("Parameter \"" + item.Key + "\" is not present in current template!");
+
+                return result;
             }
 
             readonly List<Element> elements;
-            readonly List<Variable> variables;
+            readonly Dictionary<string, string> variables;
         }
     }
 }

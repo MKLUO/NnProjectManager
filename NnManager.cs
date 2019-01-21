@@ -3,6 +3,8 @@ using System.Collections.Generic;
 
 using System.Threading;
 
+using System.IO;
+
 using Utilities;
 
 namespace NnManager {
@@ -11,18 +13,18 @@ namespace NnManager {
 
         // Loaded Project
         public Project(
-            string path,
+            string projPath,
             bool load = false) {
 
             // TODO: Handle exception according to load
+            this.path = Path.GetDirectoryName(projPath);            
 
-            this.path = path;    
             if (load) {
                 var projData = 
                     (KeyValuePair<
                         Dictionary<string, Template>, 
                         Dictionary<string, NnTask>
-                    >)Util.DeserializeFromFile(path);
+                    >)Util.DeserializeFromFile(projPath);
                 this.templates  = projData.Key;
                 this.tasks      = projData.Value;
             } else {
@@ -31,12 +33,6 @@ namespace NnManager {
                 this.tasks = 
                     new Dictionary<string, NnTask>();
             }
-        }
-
-        public void SetOutputPath(
-            string path
-        ) {
-            outputPath = path;
         }
 
         public void AddTemplate(
@@ -72,7 +68,7 @@ namespace NnManager {
                 string id = pair.Key;
                 NnTask task = pair.Value;
                 // task.Launch(Util.SubPath(rootPath, id));
-                task.Launch(outputPath);
+                task.Launch(path);
             }
         }
 
@@ -108,7 +104,6 @@ namespace NnManager {
         }
 
         readonly string path;
-        string outputPath;
 
         Dictionary<string, Template> templates;
         Dictionary<string, NnTask> tasks;

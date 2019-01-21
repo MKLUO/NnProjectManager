@@ -29,7 +29,7 @@ namespace nnProjectManager
 
             projTest.AddTemplate(
                 "Temp01", 
-                "\n\n\r\n @define   \t\t\tkkk_kk 1234sdasd__\n\n\n\n123123 @kkk_kk \t\t \t\t 1312 123"
+                "\n\n\r\n @define   \t\t\tkkkqqq_ 1234sdasd__\n@define 123123 kkkqqq_\n\n\n123123 @kkkqq_+@123123 \t\t \t\t 1312 123"
             );
 
             projTest.AddTask(
@@ -37,7 +37,8 @@ namespace nnProjectManager
                 "Temp01",        
                 new Dictionary<string, string>        
                 {
-                    {"What", "Yup"}
+                    {"123123", "Yup"},
+                    {"kkkqq_", "YupYO"}
                 }
             );
 
