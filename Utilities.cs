@@ -16,7 +16,7 @@ namespace NnManager
 
         public static void InitNnFolder(string path, string content) {
             // TODO: 
-
+            string dir;
         }
 
         public static void CheckNn(string path) {
@@ -58,6 +58,14 @@ namespace NnManager
     }
 
     public static class Util {
+
+        static string log = "";
+        public static void Log(string msg) {
+            log += msg;
+        }
+        public static string getLog() {
+            return log;
+        }
 
         public static void StartAndWaitProcess(string fileName, string arguments) {
             using (Process process = new Process()) {

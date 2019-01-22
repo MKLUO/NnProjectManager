@@ -9,31 +9,26 @@ namespace NnManager {
 
     public partial class Project {
 
-        // Loaded Project
-        public Project(
-            string path = null,
-            bool load = false) {
-
+        
+        public Project() {
             // TODO: Handle exception according to load
-            if (path != null)
-                this.path = path;            
+            this.templates = 
+                new Dictionary<string, Template>();
+            this.tasks = 
+                new Dictionary<string, NnTask>();
+        }
 
-            if (load) {
-                var projData = 
-                    (KeyValuePair<
-                        Dictionary<string, Template>, 
-                        Dictionary<string, NnTask>
-                    >)Util.DeserializeFromFile(
-                        path
-                    );
-                this.templates  = projData.Key;
-                this.tasks      = projData.Value;
-            } else {
-                this.templates = 
-                    new Dictionary<string, Template>();
-                this.tasks = 
-                    new Dictionary<string, NnTask>();
-            }
+        // Loaded Project
+        public Project(string path) {
+            var projData = 
+                (KeyValuePair<
+                    Dictionary<string, Template>, 
+                    Dictionary<string, NnTask>
+                >)Util.DeserializeFromFile(
+                    path
+                );
+            this.templates  = projData.Key;
+            this.tasks      = projData.Value;
         }
 
         public void AddTemplate(
@@ -64,7 +59,7 @@ namespace NnManager {
         }
 
         // For testing
-        public void LaunchAllTask() {
+        public void LaunchAllTask(string path) {
             foreach (var pair in tasks) {
                 string id = pair.Key;
                 NnTask task = pair.Value;
@@ -103,8 +98,6 @@ namespace NnManager {
                     >(templates, tasks),
                 path);  
         }
-
-        readonly string path;
 
         Dictionary<string, Template> templates;
         Dictionary<string, NnTask> tasks;

@@ -36,7 +36,7 @@ namespace NnManager {
                 }
 
             // Check for integrity
-            public bool IsIntegrited() {
+            public bool IsIntegrited(string path) {
                 // TODO: check output existance/integrity accoding to id 
                 // TODO: if corrupted or output is missing, reset it
 
@@ -51,23 +51,28 @@ namespace NnManager {
                 string path
             ) {
                 // TODO: switch status
-                if (status == Status.Running) return;
+                if (status != Status.New) return;
 
                 status = Status.Running;
 
                 // TODO: generate input file and directory
                 // TODO: verify path
 
-                NnAgent.InitNnFolder(path, content);
+                try {
+                    NnAgent.InitNnFolder(path, content);
+                    task = new Task(
+                        () => {
+                            NnAgent.RunNn(path);
+                            AfterRun(path);
+                        }
+                    );
 
-                task = new Task(
-                    () => {
-                        NnAgent.RunNn(path);
-                        AfterRun(path);
-                    }
-                );
-
-                task.Start();
+                    task.Start();
+                } catch {
+                    Util.Log("Error occured in task launch!");
+                } finally {
+                    AfterRun(path);
+                }                
             }
 
             public void KillTask() {
@@ -77,7 +82,8 @@ namespace NnManager {
             void AfterRun(
                 string path
             ) {
-                // TODO: parse log to look for errors
+                // TODO: parse log to look for errors & warnings (to decide status)
+                // TODO: Event to proc GUI refreash?
                 status = Status.Done;
                 outputHash = Util.HashPath(path);
             }
