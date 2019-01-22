@@ -6,8 +6,6 @@ using System.Collections.Generic;
 
 using System.Runtime.Serialization;
 
-using Utilities;
-
 namespace NnManager {
 
     public partial class Project {
@@ -64,7 +62,7 @@ namespace NnManager {
 
                 task = new Task(
                     () => {
-                        Utilities.NnAgent.RunNn(path);
+                        NnAgent.RunNn(path);
                         AfterRun(path);
                     }
                 );

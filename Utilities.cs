@@ -7,7 +7,7 @@ using System.Linq;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 
-namespace Utilities
+namespace NnManager
 {
     public static class NnAgent {
 
@@ -39,6 +39,8 @@ namespace Utilities
             // TODO: Check if there's no multiple instances of NN running on same directory
             // TODO: build process argument string.
             // TODO: Path check (check for safety!)
+
+            // TODO: Should input be path or content??????
 
             try {
                 Util.StartAndWaitProcess(

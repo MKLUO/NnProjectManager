@@ -5,26 +5,27 @@ using System.Threading;
 
 using System.IO;
 
-using Utilities;
-
 namespace NnManager {
 
     public partial class Project {
 
         // Loaded Project
         public Project(
-            string projPath,
+            string path = null,
             bool load = false) {
 
             // TODO: Handle exception according to load
-            this.path = Path.GetDirectoryName(projPath);            
+            if (path != null)
+                this.path = path;            
 
             if (load) {
                 var projData = 
                     (KeyValuePair<
                         Dictionary<string, Template>, 
                         Dictionary<string, NnTask>
-                    >)Util.DeserializeFromFile(projPath);
+                    >)Util.DeserializeFromFile(
+                        path
+                    );
                 this.templates  = projData.Key;
                 this.tasks      = projData.Value;
             } else {
@@ -51,7 +52,7 @@ namespace NnManager {
         ){
             string id;
             do {
-                id = Utilities.Util.RandomString(20);
+                id = Util.RandomString(20);
             } while (tasks.ContainsKey(id));
             
             tasks.Add(
@@ -93,7 +94,7 @@ namespace NnManager {
             Console.WriteLine("All tasks done!");
         }
 
-        public void Save() {                        
+        public void Save(string path) {                        
             // TODO: Serialize
             Util.SerializeToFile(
                 new KeyValuePair<
