@@ -6,102 +6,148 @@ using System.Collections.Generic;
 
 using System.Runtime.Serialization;
 
+using System.ComponentModel;
+
 namespace NnManager {
+
+    using RPath = Util.RestrictedPath;
 
     public partial class Project {
 
         [Serializable]
-        class NnTask {
+        class NnTask : INotifyPropertyChanged {
+            // INFO: NnTask is not aware of the directory where actual execution takes place. It only stores NN input content and execution status.
 
-            // TODO: All File system related operations should be encapsulated here.
+            #region INotifyPropertyChanged
+            public event PropertyChangedEventHandler PropertyChanged;
 
-            public enum Status {
+            void OnPropertyChanged(string str)
+            {
+                OnPropertyChanged(new PropertyChangedEventArgs(str));
+            }
+
+            protected void OnPropertyChanged(PropertyChangedEventArgs e)
+            {
+                PropertyChangedEventHandler handler = PropertyChanged;
+                if (handler != null)
+                    handler(this, e);
+            }
+            #endregion
+
+            readonly string name;
+            readonly string content;
+            readonly Dictionary<string, string> param;
+
+            string outputHash;
+
+            // [NonSerialized]
+            // Task task;
+
+            enum NnTaskStatus {
                 New,
                 Running,
                 Done,
                 Error
             };
 
-            // New Task
+            // TODO: Status should be determined when loaded
+            [NonSerialized]
+            NnTaskStatus status;
+            NnTaskStatus Status {
+                get {
+                    return status;
+                }
+                set {
+                    if (value != status) {
+                        status = value;
+                        OnPropertyChanged("Status");
+                    }
+                }
+            }
+
+            public string GetStatus()
+            {
+                return Status.ToString();
+            }
+
+            // TODO: All File system related operations should be encapsulated in Utility.
+
             public NnTask(
-                string name,
-                string content) {
-                    this.name = name;
+                string content,
+                Dictionary<string, string> param):
+                    this(
+                        content,
+                        param,
+                        ""
+                    ) {}
+                
+
+            public NnTask(
+                string content,
+                Dictionary<string, string> param,
+                string name) {
                     this.content = content;
+                    this.param = param;
+                    this.name = name;
 
                     this.outputHash = null;
 
-                    this.task = null;
-                    this.status = Status.New;
+                    // this.task = null;
+                    this.Status = NnTaskStatus.New;
                 }
 
+            public string GetName() {
+                return name;
+            }
+
             // Check for integrity
-            public bool IsIntegrited(string path) {
-                // TODO: check output existance/integrity accoding to id 
-                // TODO: if corrupted or output is missing, reset it
+            public void OutputValidation(
+                RPath path
+            ) {
+                if (outputHash == null) return;
 
-                return true;
+                string newHash = Util.HashPath(path);
+
+                if (newHash == outputHash)
+                    Status = NnTaskStatus.Done; 
             }
 
-            public void Reset() {
-
-            }
+            // public void Reset() {
+            //     this.outputHash = null;
+            //     this.task = null;
+            //     this.status = Status.New;
+            // }
 
             public void Launch(
-                string path
+                RPath path
             ) {
-                // TODO: switch status
-                if (status != Status.New) return;
+                try
+                {
+                    Status = NnTaskStatus.Running;
 
-                status = Status.Running;
-
-                // TODO: generate input file and directory
-                // TODO: verify path
-
-                try {
-                    NnAgent.InitNnFolder(path, content);
-                    task = new Task(
-                        () => {
-                            NnAgent.RunNn(path);
-                            AfterRun(path);
-                        }
+                    NnAgent.InitNnFolder(
+                        path, 
+                        content
                     );
 
-                    task.Start();
-                } catch {
-                    Util.Log("Error occured in task launch!");
-                } finally {
-                    AfterRun(path);
+                    if (NnAgent.CheckNn(path, true)){
+                        // FIXME: testing 
+                        // NnAgent.RunNn(path, true);
+                        NnAgent.RunNn(path);
+                        // TODO: parse log to look for errors & warnings (to decide status)
+                        Status = NnTaskStatus.Done;
+
+                        outputHash = Util.HashPath(path);
+                    } else {
+                        Status = NnTaskStatus.Error;
+                    }
+                }
+                catch
+                {             
+                    Status = NnTaskStatus.Error;       
+                    throw new Exception("Exception encountered in Launch (NnTask)!");
                 }                
             }
-
-            public void KillTask() {
-                // TODO: 
-            }
-
-            void AfterRun(
-                string path
-            ) {
-                // TODO: parse log to look for errors & warnings (to decide status)
-                // TODO: Event to proc GUI refreash?
-                status = Status.Done;
-                outputHash = Util.HashPath(path);
-            }
-
-            public Status GetStatus() {
-                return status;
-            }
-            
-            readonly string name;
-            readonly string content;
-
-            string outputHash;
-
-            [NonSerialized]
-            Task task;
-
-            Status status;
         }
-
     }
 }
