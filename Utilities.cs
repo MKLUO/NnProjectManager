@@ -14,37 +14,45 @@ namespace NnManager
 {
     using RPath = Util.RestrictedPath;
 
-    public static class NnAgent {
+    public static class NnAgent
+    {
 
         // TODO: Check for NN exe
         readonly static string nnMainPath = @"C:\Program Files (x86)\nextnano\2015_08_19\";
         readonly static string inputFileName = @"nnInput.in";
-        readonly static string inputFileNameBackup = @"nnInput.in.txt";
+        readonly static string inputFileNameBackup = @"nnInput.txt";
         readonly public static string projFileName = @"nnProj";
 
-        public static void InitNnFolder(RPath path, string content) {
+        static void InitNnFolder(RPath path, string content)
+        {
             // TODO: 
             Directory.CreateDirectory(path.ToString());
             File.WriteAllText(
-                path.SubPath(inputFileName).ToString(), 
+                path.SubPath(inputFileName).ToString(),
                 content);
             File.WriteAllText(
-                path.SubPath(inputFileNameBackup).ToString(), 
+                path.SubPath(inputFileNameBackup).ToString(),
                 content);
         }
 
-        public static bool CheckNn(RPath path, bool test = false) {
+        public static bool CheckNn(RPath path, string content, bool test = false)
+        {
 
             // FIXME: test
-            if (test) {
-                return true;
-            }
+            
+            try
+            {
+                InitNnFolder(path, content);
 
-            try {
+                if (test)
+                {
+                    return true;
+                }
+
                 Util.StartAndWaitProcess(
                     nnMainPath + @"nextnano++\bin 64bit\nextnano++_Intel_64bit.exe",
-                    " -s --license \""    + nnMainPath + "License\\license.txt\"" +
-                    " --database \""   + nnMainPath + "nextnano++\\Syntax\\database_nnp.in\"" +
+                    " -s --license \"" + nnMainPath + "License\\license.txt\"" +
+                    " --database \"" + nnMainPath + "nextnano++\\Syntax\\database_nnp.in\"" +
                     " --outputdirectory \"" + path.ToString() + "\"" +
                     " --noautooutdir -log \"" + path.SubPath(inputFileName).ToString()
                 );
@@ -53,12 +61,15 @@ namespace NnManager
                 // TODO: parse log to look for syntax error
 
                 return true;
-            } catch {
+            }
+            catch
+            {
                 throw new Exception("Exception encountered in CheckNn (NnAgent)!");
             }
         }
 
-        public static void RunNn(RPath path, bool test = false) {
+        public static void RunNn(RPath path, string content, bool test = false)
+        {
             // TODO: Input file should be in this directory(name). 
             // TODO: Check if there's no multiple instances of NN running on same directory
             // TODO: build process argument string.
@@ -67,80 +78,136 @@ namespace NnManager
             // TODO: Should input be path or content??????
 
             // FIXME: test
-            if (test) {
-                System.Threading.Thread.Sleep(10000);
-                File.Create(path.SubPath("done.txt").ToString()).Close();
-                return;
-            }
 
-            try {
+            try
+            {
+                InitNnFolder(path, content);
+
+                if (test)
+                {
+                    System.Threading.Thread.Sleep(10000);
+                    File.Create(path.SubPath("done.txt").ToString()).Close();
+                    return;
+                }
+
                 Util.StartAndWaitProcess(
                     nnMainPath + "nextnano++\\bin 64bit\\nextnano++_Intel_64bit.exe",
-                    " --license \""    + nnMainPath + "License\\license.txt\"" +
-                    " --database \""   + nnMainPath + "nextnano++\\Syntax\\database_nnp.in\"" +
+                    " --license \"" + nnMainPath + "License\\license.txt\"" +
+                    " --database \"" + nnMainPath + "nextnano++\\Syntax\\database_nnp.in\"" +
                     " --outputdirectory \"" + path.ToString() + "\"" +
                     " --noautooutdir -log \"" + path.SubPath(inputFileName)
                 );
-            } catch {
+            }
+            catch
+            {
                 throw new Exception("Exception encountered in RunNn (NnAgent)!");
             }
         }
     }
 
-    public static class Util {
+    public static class Util
+    {
+        #region WarnAndDecide
 
-        public class RestrictedPath {
+        public class WarnAndDecideEventArgs
+        {
+            public WarnAndDecideEventArgs(string s) { Text = s; }
+            public String Text { get; } // readonly
+        }
+
+        public delegate bool WarnAndDecideEventHandler(WarnAndDecideEventArgs e);
+
+        static event WarnAndDecideEventHandler warning;
+        public static event WarnAndDecideEventHandler Warning
+        {
+            add
+            {
+                warning = value;
+            }
+            remove
+            {
+                warning -= value;
+            }
+        }
+
+        public static bool WarnAndDecide(string msg)
+        {
+            WarnAndDecideEventHandler handler = warning;
+            if (handler != null)
+                return handler(new WarnAndDecideEventArgs(msg));
+            else
+                return true;
+        }
+
+        #endregion
+
+        #region Error
+
+        public class ErrorEventArgs
+        {
+            public ErrorEventArgs(string s) { Text = s; }
+            public String Text { get; } // readonly
+        }
+
+        public delegate void ErrorEventHandler(ErrorEventArgs e);
+
+        public static event ErrorEventHandler Error;
+
+        public static void ErrorHappend(string msg)
+        {
+            ErrorEventHandler handler = Error;
+            if (handler != null)
+                handler(new ErrorEventArgs(msg));
+        }
+
+        #endregion
+
+        [Serializable]
+        public class RestrictedPath
+        {
 
             readonly string path;
 
-            static string scope;
-            public static void InitRoot(string path) {
-                Path.GetFullPath(path);
+            public static RestrictedPath InitRoot(string path)
+            {
+                string fullPath = Path.GetFullPath(path);
 
-                if (!Directory.Exists(path))
-                    Directory.CreateDirectory(path);
+                if (!Directory.Exists(fullPath))
+                    Directory.CreateDirectory(fullPath);
 
-                scope = path;
+                return new RestrictedPath(fullPath);
             }
 
-            public RestrictedPath(string path) {
-                // TODO: Verification, tidying and restriction of path
-                if (scope == null)
-                    throw new Exception("Scope is not set in RPath!");
-                    
-                if (!path.StartsWith(scope))
-                    throw new Exception("Path is out of scope!");
-
-                this.path = Path.GetFullPath(path);
+            RestrictedPath(string path)
+            {
+                this.path = path;
             }
 
-            public static implicit operator RestrictedPath(string path) {
-                return new RestrictedPath(path);
-            }
+            // public static implicit operator RestrictedPath(string path)
+            // {
+            //     return new RestrictedPath(path);
+            // }
 
-            public RestrictedPath GetDir() {
-                return Directory.GetParent(path).ToString();
-            }
+            // public RestrictedPath GetDir()
+            // {
+            //     return Directory.GetParent(path).ToString();
+            // }
 
-            public RestrictedPath SubPath(string folder) {
+            public RestrictedPath SubPath(string folder)
+            {
                 // TODO: check for parent path
-                string fullPath;
-                try {
-                    fullPath = Path.GetFullPath(path);
-                } catch {
-                    throw new Exception("Exception occured in Util.SubPath!");
-                }
-                string resultPath = fullPath + "\\" + folder;
+                string resultPath = Path.GetFullPath(path + "\\" + folder);
 
-                if (Directory.GetParent(resultPath).ToString().ToLower() != 
-                    new DirectoryInfo(fullPath).ToString().ToLower())
-                    throw new Exception("Exception occured in Util.SubPath! (input must be single-layered)");
+                if (Directory.GetParent(resultPath).ToString().ToLower() !=
+                    new DirectoryInfo(path).ToString().ToLower())
+                    throw new Exception("Exception occured in Util.SubPath! (input must be single-layered subfolder/file)");
 
                 return new RestrictedPath(resultPath);
             }
 
             override
-            public string ToString() {
+            public string ToString()
+            {
                 return path;
             }
         }
@@ -148,17 +215,21 @@ namespace NnManager
         #region log
 
         static string log = "";
-        public static void Log(string msg) {
-            log += '\n' + msg;
+        public static void Log(string msg)
+        {
+            log += msg + '\n';
         }
-        public static string GetLog() {
+        public static string GetLog()
+        {
             return log;
         }
 
         #endregion
 
-        public static void StartAndWaitProcess(string fileName, string arguments) {
-            using (Process process = new Process()) {
+        public static void StartAndWaitProcess(string fileName, string arguments)
+        {
+            using (Process process = new Process())
+            {
                 process.StartInfo.FileName = fileName;
                 process.StartInfo.Arguments = arguments;
                 process.StartInfo.UseShellExecute = false;
@@ -179,10 +250,10 @@ namespace NnManager
 
         #region hashing
 
-        public static string HashPath(RPath path)
+        public static string HashPath(string path)
         {
             // TODO:
-            string result = ""; 
+            string result = "";
             List<string> entries = new List<string>();
 
             if (Directory.Exists(path.ToString()))
@@ -191,8 +262,9 @@ namespace NnManager
             else if (File.Exists(path.ToString()))
                 entries.Add(path.ToString());
             else return "";
-            
-            foreach (string entry in entries) {
+
+            foreach (string entry in entries)
+            {
                 string entryPath = Path.GetFileName(entry);
                 result += Hash(entryPath);
                 if (Directory.Exists(entry))
@@ -223,33 +295,39 @@ namespace NnManager
 
         #region serializing
 
-        public static void SerializeToFile(Object obj, RPath filePath) {
+        public static void SerializeToFile(Object obj, RPath filePath)
+        {
             // TODO: File mode?
-            using (Stream stream = File.Open(filePath.ToString(), FileMode.Create)) {
+            using (Stream stream = File.Open(filePath.ToString(), FileMode.Create))
+            {
                 BinaryFormatter formatter = new BinaryFormatter();
                 formatter.Serialize(stream, obj);
             }
         }
 
-        public static Object DeserializeFromFile(RPath filePath) {
+        public static Object DeserializeFromFile(RPath filePath)
+        {
             // TODO: 
-            using (Stream stream = File.Open(filePath.ToString(), FileMode.Open)) {
+            using (Stream stream = File.Open(filePath.ToString(), FileMode.Open))
+            {
                 BinaryFormatter formatter = new BinaryFormatter();
                 return formatter.Deserialize(stream);
             }
         }
 
         #endregion
-    
-        public static string ParamToTag(Dictionary<string, string> param) {
+
+        public static string ParamToTag(Dictionary<string, (string, string)> param)
+        {
             string result = "";
 
             foreach (var pair in param)
             {
-                result += "_" + pair.Key + "-" + pair.Value;
+                if (pair.Value.Item1 != null)
+                    result += "_" + pair.Key + "-" + pair.Value.Item1;
             }
 
             return result;
-        }
+        }        
     }
 }

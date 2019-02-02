@@ -12,11 +12,9 @@ using System.ComponentModel;
 
 namespace NnManager
 {
-
     using RPath = Util.RestrictedPath;
 
-    public partial class Project : INotifyPropertyChanged   
-    // public partial class Project
+    public partial class Project : INotifyPropertyChanged
     {
         #region INotifyPropertyChanged
         public event PropertyChangedEventHandler PropertyChanged;
@@ -26,7 +24,7 @@ namespace NnManager
             OnPropertyChanged(new PropertyChangedEventArgs(str));
         }
 
-        protected void OnPropertyChanged(PropertyChangedEventArgs e)
+        void OnPropertyChanged(PropertyChangedEventArgs e)
         {
             PropertyChangedEventHandler handler = PropertyChanged;
             if (handler != null)
@@ -39,6 +37,8 @@ namespace NnManager
         }
         #endregion
 
+        #region core
+
         readonly RPath path; // Project root
 
         Dictionary<string, Template> templates;
@@ -47,13 +47,16 @@ namespace NnManager
         // Load Project
         public Project(string initPath, bool load = false)
         {
-            RPath.InitRoot(initPath);
-            this.path = new RPath(initPath);
+            path = RPath.InitRoot(initPath);
 
             runningTasks = new Dictionary<string, Task>();
             queuedTasks = new ConcurrentQueue<string>();
 
-            if (load) {   
+            templates = new Dictionary<string, Template>();
+            tasks = new Dictionary<string, NnTask>();
+
+            if (load)
+            {
                 var projData =
                     (KeyValuePair<
                         Dictionary<string, Template>,
@@ -69,14 +72,45 @@ namespace NnManager
                 {
                     string id = pair.Key;
                     NnTask task = pair.Value;
-                    // TODO: Restore state
+                    // TODO: Restore state & event
+                    task.PropertyChanged += OnTaskPropertyChanged;
                     task.OutputValidation(path.SubPath("output").SubPath(id));
                 }
+            }            
+        }
 
-            } else {
-                this.templates = new Dictionary<string, Template>();
-                this.tasks = new Dictionary<string, NnTask>();
-            }
+        public static Project NewProject(string initPath)
+        {
+            RPath path = RPath.InitRoot(initPath);
+
+            // if (File.Exists(
+            //     path.SubPath(NnAgent.projFileName).ToString()))
+            if (Directory.GetFileSystemEntries(path.ToString()).Count() != 0)
+                if (!Util.WarnAndDecide(
+                    "The folder chosen is not empty.\nContinue?"))
+                    return null;
+
+            Project project = new Project(initPath);
+            project.Save();
+
+            return project;
+        }
+
+        public static Project LoadProject(string initPath)
+        {
+            RPath path = RPath.InitRoot(initPath);
+
+            if (!File.Exists(
+                path.SubPath(NnAgent.projFileName).ToString())) {
+                Util.ErrorHappend(
+                    "No project in this directory!");
+                    return null;
+                }
+
+            Project project = new Project(initPath, true);
+            project.Save();
+
+            return project;
         }
 
         public void AddTemplate(
@@ -92,10 +126,9 @@ namespace NnManager
             //OnPropertyChanged("templates");
         }
 
-        
-        public void AddTask(            
+        public void AddTask(
             string templateId,
-            Dictionary<string, string> param
+            Dictionary<string, (string, string)> param
         )
         {
             // string id;
@@ -111,8 +144,13 @@ namespace NnManager
                 tasks.Add(
                     id,
                     new NnTask(
+                        id,
                         templates[templateId].GenerateContent(param),
-                        param
+                        new Dictionary<string, object>
+                        {
+                            {"param", param},
+                            {"templateId", templateId}
+                        }                                              
                     )
                 );
                 tasks[id].PropertyChanged += OnTaskPropertyChanged;
@@ -125,6 +163,8 @@ namespace NnManager
             //OnPropertyChanged("tasks");
         }
 
+        #endregion
+
         #region scheduling
 
         Task scheduler;
@@ -132,45 +172,57 @@ namespace NnManager
         Dictionary<string, Task> runningTasks;
         ConcurrentQueue<string> queuedTasks;
 
-        public void StartScheduler() {
-            if (scheduler == null) {
+        // FIXME: bad smell
+
+        public void StartScheduler(bool testing = false)
+        {
+            if (scheduler == null)
+            {
                 schedulerActive = true;
-                scheduler = Task.Run(() => SchedulerMainLoop());
+                scheduler = Task.Run(() => SchedulerMainLoop(testing));
                 return;
             }
 
-            if (!schedulerActive && (scheduler.Status != TaskStatus.Running)){
+            if (!schedulerActive && (scheduler.Status != TaskStatus.Running))
+            {
                 schedulerActive = true;
-                scheduler = Task.Run(() => SchedulerMainLoop());
+                scheduler = Task.Run(() => SchedulerMainLoop(testing));
                 return;
             }
         }
 
-        public void StopScheduler() {
+        public void StopScheduler()
+        {
             schedulerActive = false;
         }
 
-        public string GetSchedulerStatus() {
+        public string GetSchedulerStatus()
+        {
             if (schedulerActive) return "Active";
             else return "Inactive";
         }
 
         // FIXME: options
-        const int maxTasks = 3;
-        void SchedulerMainLoop() {
-            do {
+        const int maxTasks = 4;
+        void SchedulerMainLoop(bool testing)
+        {
+            do
+            {
                 runningTasks = runningTasks.Where(
                     pair => !pair.Value.IsCompleted
-                ).ToDictionary(pair => pair.Key,pair => pair.Value);
+                ).ToDictionary(pair => pair.Key, pair => pair.Value);
 
-                if (runningTasks.Count < maxTasks) {
-                    if (queuedTasks.Count > 0){
-                        string id; 
+                if (runningTasks.Count < maxTasks)
+                {
+                    if (queuedTasks.Count > 0)
+                    {
+                        string id;
                         if (queuedTasks.TryDequeue(out id))
                             runningTasks.Add(
                                 id, Task.Run(
                                     () => tasks[id].Launch(
-                                        path.SubPath("output").SubPath(id)
+                                        path.SubPath("output").SubPath(id),
+                                        testing
                                     )
                                 )
                             );
@@ -178,12 +230,18 @@ namespace NnManager
                 }
 
                 Thread.Sleep(1000);
-            } while(schedulerActive);
+            } while (schedulerActive);
         }
 
-        public void EnqueueTask(string id) {
+        public void EnqueueTask(string id)
+        {
             if ((!queuedTasks.Contains(id)) && (!runningTasks.ContainsKey(id)))
                 queuedTasks.Enqueue(id);
+        }
+
+        public bool IsSchedulerRunning()
+        {
+            return schedulerActive;
         }
 
         #endregion
@@ -202,24 +260,36 @@ namespace NnManager
             return list;
         }
 
-        public List<Tuple<string, string>> GetTaskInfos()
+        public List<Tuple<string, string>> GetTasksStatus()
         {
             List<Tuple<string, string>> list = new List<Tuple<string, string>>();
 
             foreach (var task in tasks)
             {
                 list.Add(new Tuple<string, string>(
-                    task.Key, 
+                    task.Key,
                     task.Value.GetStatus()));
             }
 
             return list;
         }
 
-        public List<string> GetTemplateInfo(string id)
+        public List<string> GetQueuedTasksInfo()
         {
-            return templates[id].GetVariablesInfo();
+            return queuedTasks.ToList();
         }
+
+        public Dictionary<string, (string, string)> GetTemplateParam(string id)
+        {
+            return templates[id].GetVariables();
+        }
+
+        public Dictionary<string, object> GetTaskInfo(string id)
+        {
+            return tasks[id].GetInfo();
+        }
+
+        
 
         #endregion
 

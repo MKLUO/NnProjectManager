@@ -95,7 +95,7 @@ namespace NnManager {
             }
 
             public string GenerateContent(
-                Dictionary<string, string> param) {
+                Dictionary<string, (string, string)> param) {
                 string result = "";
 
                 // Check if any param is not used
@@ -113,15 +113,14 @@ namespace NnManager {
                             break;
 
                         case Element.Type.Value:
-                            if (param.ContainsKey(element.name)){
-                                result += param[element.name];
-                                paramCheck[element.name] = true;
+                            if (param.ContainsKey(element.name)) {
+                                if (param[element.name].Item1 != null)
+                                    result += param[element.name].Item1;
+                                else if (param[element.name].Item2 != null)
+                                    result += param[element.name].Item2;
+                                else
+                                    throw new Exception("Variable missing in param.");
                             }
-                            else if (defaultParams.ContainsKey(element.name))
-                                result += defaultParams[element.name];
-                            else
-                                throw new Exception("Variable missing in param.");
-
                             // TODO: Implement custom exception
                             break;
                     }
@@ -138,15 +137,16 @@ namespace NnManager {
                 return name;
             }
 
-            public List<string> GetVariablesInfo() {
-                List<string> info = new List<string>();
+            public Dictionary<string, (string, string)> GetVariables() {
+                Dictionary<string, (string, string)> info = 
+                new Dictionary<string, (string, string)>();
 
                 foreach (string variable in variables)
                 {
                     if (defaultParams.ContainsKey(variable))
-                        info.Add(variable + " (" + defaultParams[variable] + ")");
+                        info[variable] = (null, defaultParams[variable]);
                     else
-                        info.Add(variable);                        
+                        info[variable] = (null, null); 
                 }
 
                 return info;
