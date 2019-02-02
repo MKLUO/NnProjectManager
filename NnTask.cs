@@ -81,6 +81,8 @@ namespace NnManager
                 }
             }
 
+            
+
             public string GetStatus()
             {
                 return Status.ToString();
@@ -91,19 +93,12 @@ namespace NnManager
                 return info;
             }
 
-
+            public string GetName()
+            {
+                return name;
+            }
 
             // TODO: All File system related operations should be encapsulated in Utility.
-
-            // public NnTask(
-            //     string content,
-            //     Dictionary<string, (string, string)> param) :
-            //         this(
-            //             content,
-            //             param,
-            //             ""
-            //         )
-            // { }
 
             public NnTask(
                 string name,
@@ -121,38 +116,17 @@ namespace NnManager
                 this.Status = NnTaskStatus.New;
             }
 
-            // public NnTask(
-            //     Template template,
-            //     Dictionary<string, (string, string)> param,
-            //     string name)
-            // {
-            //     this.template = template;
-            //     this.param = param;
-            //     this.name = name;
-
-            //     // this.outputHash = null;
-
-            //     // this.task = null;
-            //     this.Status = NnTaskStatus.New;
-            // }
-
-            public string GetName()
-            {
-                return name;
-            }
-
             // Check for integrity
             public void OutputValidation(
                 RPath path
             )
             {
-                // if (outputHash == null) return;
-
                 // TODO: Hashing take too much time. Maybe integration check is not necessery?
-                // string newHash = Util.HashPath(path.ToString());
-
+                // if (outputHash == null) return;
+                // string newHash = Util.HashPath(path.ToString());                
                 // if (newHash == outputHash)
                 //     Status = NnTaskStatus.Done; 
+
                 switch (Status) {
                     case NnTaskStatus.Done:
                         if (!Directory.Exists(path.ToString()))
@@ -166,11 +140,6 @@ namespace NnManager
 
                 
             }
-
-            // public void Reset() {
-            //     this.Status = NnTaskStatus.New;
-            // }
-
             public void Launch(
                 RPath path,
                 bool testing = false
