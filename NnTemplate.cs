@@ -1,20 +1,17 @@
 using System;
 using System.Collections.Generic;
-
+using System.Linq;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Text.RegularExpressions;
-
-using System.Linq;
 
 namespace NnManager {
 
     public partial class Project {
 
         [Serializable]
-        class Template {
-            
-            readonly string name;
+        class NnTemplate {
+
             readonly List<Element> elements;
             readonly Dictionary<string, string> defaultParams;
             readonly HashSet<string> variables;
@@ -38,41 +35,36 @@ namespace NnManager {
                 readonly public string name;
             }
 
-            public Template(
-                string name,
+            public NnTemplate(
                 string content
             ) {
-                this.name = name;
-
                 // TODO: Parse for template
                 elements = new List<Element>();
                 defaultParams = new Dictionary<string, string>();
                 variables = new HashSet<string>();
 
-                string[] lines = 
+                string[] lines =
                     Regex.Split(content, ("([\r\n|\r|\n]+)"))
-                        .Where(s => s != String.Empty)
-                        .ToArray<string>();
+                    .Where(s => s != String.Empty)
+                    .ToArray<string>();
 
-                foreach(string line in lines) {
-                    if (Regex.IsMatch(line, "[ |\t]*@default[ |\t]+[0-9|A-Z|a-z|_]+[ |\t]+[0-9|A-Z|a-z|_|\"]+[ |\t]*"
-                    )) {
-                        string[] tokens = 
+                foreach (string line in lines) {
+                    if (Regex.IsMatch(line, "[ |\t]*@default[ |\t]+[0-9|A-Z|a-z|_]+[ |\t]+[0-9|A-Z|a-z|_|\"]+[ |\t]*")) {
+                        string[] tokens =
                             Regex.Split(line, "[ |\t]+")
-                                .Where(s => s != String.Empty)
-                                .ToArray<string>();
+                            .Where(s => s != String.Empty)
+                            .ToArray<string>();
 
                         defaultParams.Add(
-                                tokens[1],
-                                tokens[2]);
+                            tokens[1],
+                            tokens[2]);
                     } else {
-                        string[] tokens = 
+                        string[] tokens =
                             Regex.Split(line, "(@[0-9|A-Z|a-z|_]+)")
-                                .Where(s => s != String.Empty)
-                                .ToArray<string>();
-                        
-                        foreach (string token in tokens)
-                        {
+                            .Where(s => s != String.Empty)
+                            .ToArray<string>();
+
+                        foreach (string token in tokens) {
                             if (token[0] == '@') {
                                 elements.Add(
                                     new Element(
@@ -95,17 +87,15 @@ namespace NnManager {
             }
 
             public string GenerateContent(
-                Dictionary<string, (string, string)> param) {
+                Dictionary < string, (string, string) > param) {
                 string result = "";
 
                 // Check if any param is not used
-                Dictionary<string, bool> paramCheck
-                    = new Dictionary<string, bool>();
+                Dictionary<string, bool> paramCheck = new Dictionary<string, bool>();
                 foreach (var item in param)
                     paramCheck.Add(item.Key, false);
 
-                foreach (Element element in elements)
-                {
+                foreach (Element element in elements) {
                     switch (element.type) {
 
                         case Element.Type.Text:
@@ -120,7 +110,8 @@ namespace NnManager {
                                     result += param[element.name].Item2;
                                 else
                                     throw new Exception("Variable missing in param.");
-                            }
+                            } else
+                                throw new Exception("Variable missing in param.");
                             // TODO: Implement custom exception
                             break;
                     }
@@ -133,20 +124,15 @@ namespace NnManager {
                 return result;
             }
 
-            public string GetName() {
-                return name;
-            }
+            public Dictionary < string, (string, string) > GetVariables() {
+                Dictionary < string, (string, string) > info =
+                    new Dictionary < string, (string, string) > ();
 
-            public Dictionary<string, (string, string)> GetVariables() {
-                Dictionary<string, (string, string)> info = 
-                new Dictionary<string, (string, string)>();
-
-                foreach (string variable in variables)
-                {
+                foreach (string variable in variables) {
                     if (defaultParams.ContainsKey(variable))
                         info[variable] = (null, defaultParams[variable]);
                     else
-                        info[variable] = (null, null); 
+                        info[variable] = (null, null);
                 }
 
                 return info;

@@ -1,38 +1,31 @@
 using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.IO;
+using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 
-using System.Collections.Generic;
-
-using System.Runtime.Serialization;
-
-using System.ComponentModel;
-using System.IO;
-
-namespace NnManager
-{
+namespace NnManager {
 
     using RPath = Util.RestrictedPath;
 
-    public partial class Project
-    {
+    public partial class Project {
 
         [Serializable]
-        class NnTask : INotifyPropertyChanged
-        {
-            // INFO: NnTask is not aware of the directory where actual execution takes place. It only stores NN input content and execution status.
+        public partial class NnTask : INotifyPropertyChanged {
+            // INFO: NnTask is aware of the directory where actual execution takes place. It stores NN input content and module execution status.
 
             #region INotifyPropertyChanged
-            [field: NonSerialized]
+            [field : NonSerialized]
             public event PropertyChangedEventHandler PropertyChanged;
 
-            void OnPropertyChanged(string str)
-            {
+            void OnPropertyChanged(string str) {
                 OnPropertyChanged(new PropertyChangedEventArgs(str));
             }
 
-            protected void OnPropertyChanged(PropertyChangedEventArgs e)
-            {
+            protected void OnPropertyChanged(PropertyChangedEventArgs e) {
                 PropertyChangedEventHandler handler = PropertyChanged;
                 if (handler != null)
                     handler(this, e);
@@ -40,135 +33,148 @@ namespace NnManager
             #endregion
 
             [Serializable]
-            enum NnTaskStatus
-            {
+            public enum NnTaskStatus {
                 New,
-                Running,
                 Done,
                 Error
-            };
+            }
 
-            readonly string name;
+            readonly RPath path;
             readonly string content;
-            string executionPath;
 
-            // readonly Dictionary<string, (string, string)> param;
-            // readonly Template template;
+            Dictionary<string, object> info;
+            public Dictionary<string, object> Info {
+                get { return info; }
+                private set { }
+            }
 
-            // string outputHash;
+            [NonSerialized]
+            Task task;
 
-            readonly Dictionary<string, object> info;
-
-            // [NonSerialized]
-            // Task task;
-
-            // TODO: Status should be determined when loaded
-            //[NonSerialized]
+            [NonSerialized]
             NnTaskStatus status;
-            NnTaskStatus Status
-            {
-                get
-                {
+            public NnTaskStatus Status {
+                get {
                     return status;
                 }
-                set
-                {
-                    if (value != status)
-                    {
+                private set {
+                    if (value != status) {
                         status = value;
                         OnPropertyChanged("Status");
                     }
                 }
             }
 
-            
-
-            public string GetStatus()
-            {
-                return Status.ToString();
-            }
-
-            public Dictionary<string, object> GetInfo()
-            {
-                return info;
-            }
-
-            public string GetName()
-            {
-                return name;
-            }
-
-            // TODO: All File system related operations should be encapsulated in Utility.
-
-            public NnTask(
-                string name,
-                string content,
-                Dictionary<string, object> info
-                )
-            {
-                this.content = content;
-                this.info = info;
-                this.name = name;
-
-                // this.outputHash = null;
-
-                // this.task = null;
+            NnTask() {
+                RegisterModules();
+                CurrentModule = null;
                 this.Status = NnTaskStatus.New;
             }
 
-            // Check for integrity
-            public void OutputValidation(
-                RPath path
-            )
-            {
-                // TODO: Hashing take too much time. Maybe integration check is not necessery?
-                // if (outputHash == null) return;
-                // string newHash = Util.HashPath(path.ToString());                
-                // if (newHash == outputHash)
-                //     Status = NnTaskStatus.Done; 
+            // public NnTask(
+            //     string content,
+            //     RPath path) : this(content, path, null) { }
 
-                switch (Status) {
-                    case NnTaskStatus.Done:
-                        if (!Directory.Exists(path.ToString()))
-                            this.Status = NnTaskStatus.New;
-
-                        break;
-
-                    default:
-                        break;
-                }
-
-                
-            }
-            public void Launch(
+            public NnTask(
+                string content,
                 RPath path,
-                bool testing = false
-            )
-            {
-                try
-                {
-                    Status = NnTaskStatus.Running;
+                Dictionary<string, object> info
+            ) : this() {
+                this.content = content;
+                this.info = info;
+                this.path = path;
+            }
 
-                    if (NnAgent.CheckNn(path, content, testing))
-                    {
-                        executionPath = path.ToString();
-                        // FIXME: testing 
-                        NnAgent.RunNn(path, content, testing);
-                        // TODO: parse log to look for errors & warnings (to decide status)
-                        Status = NnTaskStatus.Done;
+            string currentModule;
+            public string CurrentModule {
+                get {
+                    return currentModule;
+                }
+                private set {
+                    if (value != currentModule)
+                        currentModule = value;
 
-                        //outputHash = Util.HashPath(path.ToString());
-                    }
-                    else
-                    {
-                        Status = NnTaskStatus.Error;
-                    }
+                    OnPropertyChanged("CurrentModule");
                 }
-                catch
-                {
-                    Status = NnTaskStatus.Error;
-                    throw new Exception("Exception encountered in Launch (NnTask)!");
+            }
+
+            [NonSerialized]
+            ConcurrentQueue<string> moduleQueue;
+            public ConcurrentQueue<string> ModuleQueue {
+                get { 
+                    if (moduleQueue == null)
+                        moduleQueue = new ConcurrentQueue<string>();
+                    return moduleQueue; 
                 }
+                private set { }
+            }
+
+            public void QueueModule(string moduleName) {
+                if (!modules.ContainsKey(moduleName))
+                    throw new Exception("Module \"" + moduleName + "\" does not exist!");
+
+                ModuleQueue.Enqueue(moduleName);
+            }
+
+            public string DequeueAndRunModule() {
+                if (ModuleQueue.Count == 0)
+                    return null;
+
+                string modulePeeked;
+                if (!ModuleQueue.TryPeek(out modulePeeked))
+                    return null;
+
+                if (!CanExecute(modulePeeked))
+                    return null;
+
+                string modulePoped;
+                if (!ModuleQueue.TryDequeue(out modulePoped))
+                    return null;
+
+                Execute(modulePoped);
+
+                return modulePoped;
+            }
+
+            public bool CanExecute(
+                string moduleName
+            ) {
+                if (!modules.ContainsKey(moduleName))
+                    return false;
+
+                if (!modules[moduleName].CanExecute())
+                    return false;
+
+                if (task != null)
+                    if (!task.IsCompleted)
+                        return false;
+
+                return true;
+            }
+
+            public void Execute(
+                string moduleName
+            ) {
+                if (!CanExecute(moduleName))
+                    throw new Exception("Module \"" + moduleName + "\" can't execute!");
+
+                task = Task.Run(
+                    () => {
+                        CurrentModule = moduleName;
+                        try {
+                            modules[moduleName].Execute();
+                        } catch {
+                            throw new Exception("Exception in module \"" + moduleName + "\"!");
+                        } finally {
+                            CurrentModule = null;
+                        }
+                    }
+                );
+            }
+
+            // BLOCKING!
+            public void WaitForTask() {
+                task?.Wait();
             }
         }
     }
