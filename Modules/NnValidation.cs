@@ -12,15 +12,15 @@ namespace NnManager {
             }
 
             public bool NnValidationCanExecute() {
-                return Status == NnTaskStatus.New;
+                return true;
             }
 
-            public void NnValidationExecute() {
-                try {
-                    NnAgent.RunNnStructure(path);
-                } catch {
-                    Status = NnTaskStatus.Error;
-                }
+            public bool NnValidationExecute() {
+                NnAgent.RunNnStructure(path.SubPath("Validation"));
+
+                // TODO: 
+                if (true) // Validation success
+                    return true;
             }
         }
     }

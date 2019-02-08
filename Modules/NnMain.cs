@@ -1,3 +1,5 @@
+using System.IO;
+
 namespace NnManager {
     using RPath = Util.RestrictedPath;
 
@@ -7,24 +9,27 @@ namespace NnManager {
                 get {
                     return new NnModule(
                         NnMainExecute,
-                        NnMainCanExecute);
+                        NnMainCanExecute,
+                        NnMainRestore);
                 }
             }
 
             public bool NnMainCanExecute() {
-                return Status == NnTaskStatus.New;
+                return !moduleDone.Contains("NN Main");
             }
 
-            public void NnMainExecute() {
-                try {
-                    NnAgent.InitNnFolder(path, content);
-                    NnAgent.RunNnStructure(path);
-                    NnAgent.RunNn(path);
+            public bool NnMainRestore() {
+                return Directory.Exists(path);
+            }
 
-                    Status = NnTaskStatus.Done;
-                } catch {
-                    Status = NnTaskStatus.Error;
-                }
+            public bool NnMainExecute() {
+                NnAgent.InitNnFolder(path, content);
+                NnAgent.RunNnStructure(path);
+                NnAgent.RunNn(path);
+
+                //TODO: parse nn log
+                
+                return true;
             }
         }
     }

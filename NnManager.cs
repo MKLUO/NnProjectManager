@@ -42,27 +42,39 @@ namespace NnManager {
 
             templates = new Dictionary<string, NnTemplate>();
             tasks = new Dictionary<string, NnTask>();
+            Log = "";
 
             if (load) {
                 var projData =
-                    (KeyValuePair<Dictionary<string, NnTemplate>, Dictionary<string, NnTask>>) Util.DeserializeFromFile(
+                    ((Dictionary<string, NnTemplate>, List<string>))Util.DeserializeFromFile(
                         path.SubPath(NnAgent.projFileName)
                     );
 
-                this.templates = projData.Key;
-                this.tasks = projData.Value;
+                this.templates = projData.Item1;
+                List<string> taskIds = projData.Item2;
 
-                foreach (var pair in tasks) {
-                    string id = pair.Key;
-                    NnTask task = pair.Value;
-                    // TODO: Restore state & event
-                    task.PropertyChanged += OnTaskPropertyChanged;
+                this.tasks = new Dictionary<string, NnTask>();
 
-                    task.RegisterModules();
-                    task.QueueModule("NN Restore");
+                foreach (string id in taskIds) {
+                    tasks[id] = NnTask.Load(path.SubPath("output").SubPath(id));
 
-                    // task.WaitForTask();
+                    tasks[id].PropertyChanged += OnTaskPropertyChanged;
+                    tasks[id].LogFired += OnTaskLogFired;
+                    tasks[id].RegisterModules();
+                    tasks[id].Restore();
                 }
+
+                // foreach (var pair in tasks) {
+                //     string id = pair.Key;
+                //     NnTask task = pair.Value;
+                //     // TODO: Restore state & event
+                //     task.PropertyChanged += OnTaskPropertyChanged;
+
+                //     task.RegisterModules();
+                //     task.Restore();
+
+                //     // task.WaitForTask();
+                // }
             }
             StartScheduler();
         }
@@ -136,7 +148,9 @@ namespace NnManager {
                         }
                     )
                 );
+                tasks[id].Save();
                 tasks[id].PropertyChanged += OnTaskPropertyChanged;
+                tasks[id].LogFired += OnTaskLogFired;
             } catch {
                 Util.ErrorHappend("Exception in AddTask!");
                 // Util.Log("Exception in AddTask!");
@@ -190,7 +204,7 @@ namespace NnManager {
                     continue;
 
                 foreach (NnTask task in tasks.Values) {
-                    string popedModule = task.DequeueAndRunModule();
+                    task.TryDequeueAndRunModule();
                 }
 
             } while (schedulerActiveFlag);
@@ -210,8 +224,9 @@ namespace NnManager {
             return list;
         }
 
-        public Dictionary < string, (string, string) > GetTasks() {
-            Dictionary < string, (string, string) > list = new Dictionary < string, (string, string) > ();
+        public Dictionary < string, (string, string, string) > GetTasks() {
+            Dictionary < string, (string, string, string) > list = 
+            new Dictionary < string, (string, string, string) > ();
 
             foreach (var task in tasks) {
 
@@ -222,7 +237,8 @@ namespace NnManager {
 
                 list[task.Key] = (
                     task.Value.CurrentModule,
-                    queue
+                    queue,
+                    task.Value.Status
                 );
             }
 
@@ -248,11 +264,44 @@ namespace NnManager {
         #endregion
 
         public void Save() {
+            List<string> taskIds = new List<string>();
+            foreach (var pair in tasks) {
+                string id = pair.Key;
+                NnTask task = pair.Value;
+
+                taskIds.Add(id);
+                //task.Save();
+            }
+
             Util.SerializeToFile(
-                new KeyValuePair<Dictionary<string, NnTemplate>, Dictionary<string, NnTask>>
-                (templates, tasks),
+                (templates, taskIds),
                 path.SubPath(NnAgent.projFileName)
             );
         }
+
+        #region log
+
+        String log;
+        public String Log {
+            get {
+                return log;
+            }
+            set {
+                if (value != log) {
+                    log = value;
+                    OnPropertyChanged("Log");
+                }
+            }
+        }
+
+        void OnTaskLogFired(NnTask sender, string msg) {
+            string id = tasks
+                .FirstOrDefault(x => x.Value == (NnTask)sender)
+                .Key;
+            
+            Log += id + " - " + msg + "\n";
+        }
+
+        #endregion
     }
 }

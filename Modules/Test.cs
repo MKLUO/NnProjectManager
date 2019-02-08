@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 
 namespace NnManager {
@@ -9,7 +10,8 @@ namespace NnManager {
                 get {
                     return new NnModule(
                         TestExecute,
-                        TestCanExecute);
+                        TestCanExecute,
+                        () => true);
                 }
             }
 
@@ -17,23 +19,26 @@ namespace NnManager {
                 return true;
             }
 
-            public void TestExecute() {
-                NnAgent.InitNnFolder(path, content);
+            public bool TestExecute() {
+                NnAgent.InitNnFolder(path.SubPath("test"), content);
 
-                string logFilePath = path.SubPath("log.txt");
+                string logFilePath = path.SubPath("test").SubPath("log.txt");
 
                 using(FileStream stream = File.Create(logFilePath)) {
                     StreamWriter sw = new StreamWriter(stream);
+                    Random random = new Random();
                     for (int i = 0; i < 10; ++i) {
                         sw.WriteLine(Util.RandomString(20));
                         sw.Flush();
-                        System.Threading.Thread.Sleep(500);
+                        Status = "Writing line " + i.ToString() + " ...";
+                        System.Threading.Thread.Sleep(
+                            random.Next(1000, 2000)
+                        );
                     }
                     sw.Close();
                 }
 
-                File.Create(path.SubPath("done.txt")).Close();
-                Status = NnTaskStatus.Done;
+                return true;
             }
         }
     }

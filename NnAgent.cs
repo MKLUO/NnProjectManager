@@ -10,13 +10,18 @@ namespace NnManager {
         readonly static string inputFileName = "nnInput.in";
         readonly static string inputFileNameBase = "nnInput.txt";
         readonly public static string projFileName = "nnProj";
+        readonly public static string taskFileName = "nnTask";
 
         public static void InitNnFolder(RPath path, string content) {
             // TODO: Backup is created here. Proceeding NN runs copy yhis backup as their input.
-            Directory.CreateDirectory(path);
-            File.WriteAllText(
-                path.SubPath(inputFileNameBase),
-                content);
+            try {
+                Directory.CreateDirectory(path);
+                File.WriteAllText(
+                    path.SubPath(inputFileNameBase),
+                    content);
+            } catch {
+                throw new Exception("Exception encountered in InitNnFolder (NnAgent)!");
+            }
         }
 
         public static void RunNnStructure(RPath path) {
@@ -35,7 +40,7 @@ namespace NnManager {
 
                 // TODO: parse log to look for syntax error
             } catch {
-                throw new Exception("Exception encountered in CheckNn (NnAgent)!");
+                throw new Exception("Exception encountered in RunNnStructure (NnAgent)!");
             }
         }
 

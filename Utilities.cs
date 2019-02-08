@@ -75,6 +75,10 @@ namespace NnManager {
 
             RestrictedPath(string path) {
                 this.path = path;
+
+                string parent = Directory.GetParent(path).ToString();
+                if (!Directory.Exists(parent))
+                    Directory.CreateDirectory(parent);
             }
 
             public static implicit operator string(RestrictedPath rPath) {
@@ -95,13 +99,13 @@ namespace NnManager {
 
         #region log
 
-        static string log = "";
-        public static void Log(string msg) {
-            log += msg + '\n';
-        }
-        public static string GetLog() {
-            return log;
-        }
+        // static string log = "";
+        // public static void Log(string msg) {
+        //     log += msg + '\n';
+        // }
+        // public static string GetLog() {
+        //     return log;
+        // }
 
         #endregion
 
@@ -186,14 +190,13 @@ namespace NnManager {
         #endregion
 
         public static string ParamToTag(Dictionary < string, (string, string) > param) {
-            string result = "";
-
-            foreach (var pair in param) {
+            if (param.Count == 0) return "";
+            
+            string result = " (";
+            foreach (var pair in param)
                 if (pair.Value.Item1 != null)
-                    result += "_" + pair.Key + "-" + pair.Value.Item1;
-            }
-
-            return result;
+                    result += pair.Key + "-" + pair.Value.Item1 + ", ";
+            return result.Substring(0, result.Length - 2) + ")";
         }
     }
 }
