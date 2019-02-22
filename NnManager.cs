@@ -6,6 +6,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
+#nullable enable
+
 namespace NnManager {
     using RPath = Util.RestrictedPath;
 
@@ -37,7 +39,7 @@ namespace NnManager {
         Dictionary<string, NnTask> tasks;
 
         // Load Project
-        public Project(string initPath, bool load = false) {
+        Project(string initPath, bool load = false) {
             path = RPath.InitRoot(initPath);
 
             templates = new Dictionary<string, NnTemplate>();
@@ -46,7 +48,7 @@ namespace NnManager {
 
             if (load) {
                 var projData =
-                    ((Dictionary<string, NnTemplate>, List<string>))Util.DeserializeFromFile(
+                    ((Dictionary<string, NnTemplate>, List<string>)) Util.DeserializeFromFile(
                         path.SubPath(NnAgent.projFileName)
                     );
 
@@ -60,42 +62,32 @@ namespace NnManager {
 
                     tasks[id].PropertyChanged += OnTaskPropertyChanged;
                     tasks[id].LogFired += OnTaskLogFired;
-                    tasks[id].RegisterModules();
                     tasks[id].Restore();
                 }
-
-                // foreach (var pair in tasks) {
-                //     string id = pair.Key;
-                //     NnTask task = pair.Value;
-                //     // TODO: Restore state & event
-                //     task.PropertyChanged += OnTaskPropertyChanged;
-
-                //     task.RegisterModules();
-                //     task.Restore();
-
-                //     // task.WaitForTask();
-                // }
             }
             StartScheduler();
         }
 
-        public static Project NewProject(string initPath) {
+        public static Project? NewProject(string initPath) {
             RPath path = RPath.InitRoot(initPath);
 
-            // if (File.Exists(
-            //     path.SubPath(NnAgent.projFileName)))
             if (Directory.GetFileSystemEntries(path).Count() != 0)
                 if (!Util.WarnAndDecide(
                         "The folder chosen is not empty.\nContinue?"))
                     return null;
 
-            Project project = new Project(initPath);
-
-            project.Save();
-            return project;
+            try {
+                Project project = new Project(initPath);
+                project.Save();
+                return project;
+            } catch {
+                Util.ErrorHappend(
+                    "Error while creating project!");
+                return null;
+            }
         }
 
-        public static Project LoadProject(string initPath) {
+        public static Project? LoadProject(string initPath) {
             RPath path = RPath.InitRoot(initPath);
 
             if (!File.Exists(
@@ -104,70 +96,140 @@ namespace NnManager {
                     "No project in this directory!");
                 return null;
             }
-
-            Project project = new Project(initPath, true);
-
-            // project.Save();
-            return project;
+            try {
+                return new Project(initPath, true);
+            } catch {
+                Util.ErrorHappend(
+                    "Error while loading project!");
+                return null;
+            }
         }
 
         public bool AddTemplate(
             string id,
-            string content) {
-            // TODO: Same id?
+            string content
+        ) {
             try {
-                templates.Add(
-                    id,
-                    new NnTemplate(content)
-                );
+                if (templates.ContainsKey(id))
+                    if (!Util.WarnAndDecide("Template with same name exists. Replace it?"))
+                        return false;
+
+                templates[id] =
+                    new NnTemplate(content);
+
+                Save();
+                return true;
             } catch {
-                Util.ErrorHappend("Exception in AddTemplate!");
-                // Util.Log("Exception in AddTemplate!");
+                Util.ErrorHappend("Error while adding template!");
+                return false;
+            }
+        }
+
+        public bool DeleteTemplate(
+            string id
+        ) {
+            try {
+                if (!templates.ContainsKey(id))
+                    return false;
+
+                foreach (NnTask task in tasks.Values)
+                    if ((string) task.Info["templateId"] == id)
+                        if (Util.WarnAndDecide("Selected template \"" + id + "\" is being referenced by at least one of the generated tasks. Continue deletion?")) {
+                            break;
+                        } else
+                            return false;
+
+                templates.Remove(id);
+                Save();
+                return true;
+
+            } catch {
+                Util.ErrorHappend("Error while deleting template!");
+                return false;
+            }
+        }
+
+        public string? AddTask(
+            NnTemplate template,
+            NnParam param
+        ) {
+            string id;
+            try {
+                // id = templateId + Util.ParamToTag(param);
+                // if (tasks.ContainsKey(id))
+                //     if (!Util.WarnAndDecide("Task with same name exists. Replace it?"))
+                //         return null;
+
+                tasks[id] =
+                    new NnTask(
+                        template.GenerateContent(param),
+                        path.SubPath("output").SubPath(id),
+                        new Dictionary<string, object> { { "param", param },
+                            { "templateId", templateId }
+                        }
+                    );
+
+                tasks[id].Save();
+                tasks[id].PropertyChanged += OnTaskPropertyChanged;
+                tasks[id].LogFired += OnTaskLogFired;
+
+                Save();
+                return id;
+            } catch {
+                Util.ErrorHappend("Error while adding task!");
+                return null;
+            }
+        }
+
+        public bool DeleteTask(
+            string taskId
+        ) {
+            //TODO: check for deletion
+            //TODO: Redo?
+            try {
+                if (!tasks.ContainsKey(taskId))
+                    return false;
+
+                if (tasks[taskId].IsBusy())
+                    if (Util.WarnAndDecide("Selected task \"" + taskId + "\" is busy rn. Terminate and delete?")) {
+                        tasks[taskId].Terminate();
+                    } else {
+                        return false;
+                    }
+
+                tasks.Remove(taskId);
+            } catch {
+                Util.ErrorHappend("Error while deleting task!");
                 return false;
             }
 
             Save();
             return true;
-            //OnPropertyChanged("templates");
         }
 
-        public string AddTask(
-            string templateId,
-            Dictionary < string, (string, string) > param
-        ) {
-            string id = templateId + Util.ParamToTag(param);
+        // public void AddPlan(
+        //     string templateId,
+        //     string paramFilePath,
 
-            try {
-                tasks.Add(
-                    id,
-                    new NnTask(
-                        templates[templateId].GenerateContent(param),
-                        path.SubPath("output").SubPath(id),
-                        new Dictionary<string, object> { { "param", param },
-                            { "templateId", templateId }
-                        }
-                    )
-                );
-                tasks[id].Save();
-                tasks[id].PropertyChanged += OnTaskPropertyChanged;
-                tasks[id].LogFired += OnTaskLogFired;
-            } catch {
-                Util.ErrorHappend("Exception in AddTask!");
-                // Util.Log("Exception in AddTask!");
-                return null;
-            }
+        // ) {
 
-            Save();
-            return id;
-
-            //OnPropertyChanged("tasks");
-        }
+        // }
 
         #endregion
 
         #region scheduling
+        Task? scheduler;
+        Task Scheduler {
+            get {
+                if (scheduler == null)
+                    scheduler = new Task(SchedulerMainLoop);
 
-        Task scheduler;
+                return scheduler;
+            }
+            set {
+                scheduler = value;
+            }
+        }
         bool schedulerActiveFlag;
 
         const int maxConcurrentTaskCount = 5;
@@ -181,13 +243,14 @@ namespace NnManager {
             tasks[taskId].QueueModule(moduleName);
         }
 
-        public void StartScheduler() {
-            if (scheduler == null)
-                scheduler = new Task(SchedulerMainLoop);
+        public void ClearModules(string taskId) {
+            tasks[taskId].ClearModules();
+        }
 
-            if ((scheduler.Status != TaskStatus.Running) && (schedulerActiveFlag == false)) {
+        public void StartScheduler() {
+            if ((Scheduler.Status != TaskStatus.Running) && (schedulerActiveFlag == false)) {
                 schedulerActiveFlag = true;
-                scheduler = Task.Run(
+                Scheduler = Task.Run(
                     () => SchedulerMainLoop());
             }
         }
@@ -198,67 +261,17 @@ namespace NnManager {
 
         void SchedulerMainLoop() {
             do {
-                Thread.Sleep(500);
+                Task.Delay(500).Wait();
 
                 if (CurrentTaskCount >= maxConcurrentTaskCount)
                     continue;
 
                 foreach (NnTask task in tasks.Values) {
+                    Task.Delay(10).Wait();
                     task.TryDequeueAndRunModule();
                 }
 
             } while (schedulerActiveFlag);
-        }
-
-        #endregion
-
-        #region getInfo (ViewModel)
-
-        public List<string> GetTemplates() {
-            List<string> list = new List<string>();
-
-            foreach (var tmpl in templates) {
-                list.Add(tmpl.Key);
-            }
-
-            return list;
-        }
-
-        public Dictionary < string, (string, string, string) > GetTasks() {
-            Dictionary < string, (string, string, string) > list = 
-            new Dictionary < string, (string, string, string) > ();
-
-            foreach (var task in tasks) {
-
-                string queue = "";
-                foreach (var item in task.Value.ModuleQueue) {
-                    queue += item + " ";
-                }
-
-                list[task.Key] = (
-                    task.Value.CurrentModule,
-                    queue,
-                    task.Value.Status
-                );
-            }
-
-            return list;
-        }
-
-        public Dictionary < string, (string, string) > GetTemplateInfo(string id) {
-            if (id == null)
-                return new Dictionary < string, (string, string) > ();
-            if (!templates.ContainsKey(id))
-                return new Dictionary < string, (string, string) > ();
-            return templates[id].GetVariables();
-        }
-
-        public Dictionary<string, object> GetTaskInfo(string id) {
-            return tasks[id].Info;
-        }
-
-        public bool IsSchedularRunning() {
-            return schedulerActiveFlag;
         }
 
         #endregion
@@ -281,12 +294,14 @@ namespace NnManager {
 
         #region log
 
-        String log;
+        String? log;
         public String Log {
             get {
-                return log;
+                if (log == null)
+                    return "";
+                else return log;
             }
-            set {
+            private set {
                 if (value != log) {
                     log = value;
                     OnPropertyChanged("Log");
@@ -296,10 +311,72 @@ namespace NnManager {
 
         void OnTaskLogFired(NnTask sender, string msg) {
             string id = tasks
-                .FirstOrDefault(x => x.Value == (NnTask)sender)
+                .FirstOrDefault(x => x.Value == (NnTask) sender)
                 .Key;
-            
+
             Log += id + " - " + msg + "\n";
+        }
+
+        #endregion
+
+        #region getInfo (ViewModel)
+
+        public bool IsBusy() {
+            foreach (NnTask task in tasks.Values)
+                if (task.IsBusy()) return true;
+
+            return false;
+        }
+
+        public List<string> GetTemplates() {
+            List<string> list = new List<string>();
+
+            foreach (var tmpl in templates) {
+                list.Add(tmpl.Key);
+            }
+
+            return list;
+        }
+
+        public Dictionary < string, (string, string, string) > GetTasks() {
+            Dictionary < string, (string, string, string) > list =
+                new Dictionary < string, (string, string, string) > ();
+
+            foreach (var task in tasks) {
+
+                string queue = "";
+                foreach (var item in task.Value.ModuleQueue) {
+                    queue += item + " ";
+                }
+
+                list[task.Key] = (
+                    task.Value.CurrentModule,
+                    queue,
+                    task.Value.Status
+                );
+            }
+
+            return list;
+        }
+
+        // public Dictionary < string, (string, string) > GetTemplateInfo(string id) {
+        //     if (id == null)
+        //         return new Dictionary < string, (string, string) > ();
+        //     if (!templates.ContainsKey(id))
+        //         return new Dictionary < string, (string, string) > ();
+        //     return templates[id].GetVariables();
+        // }
+
+        public Dictionary<string, object> GetTaskInfo(string id) {
+            return tasks[id].Info;
+        }
+
+        public List<string> GetModules(string id) {
+            return tasks[id].Modules.Keys.ToList();
+        }
+
+        public bool IsSchedularRunning() {
+            return schedulerActiveFlag;
         }
 
         #endregion

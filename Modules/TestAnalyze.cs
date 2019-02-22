@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace NnManager {
     using RPath = Util.RestrictedPath;
@@ -18,12 +20,13 @@ namespace NnManager {
                 return moduleDone.Contains("Test");
             }
 
-            public bool TestAnalyzeExecute() {
+            public bool TestAnalyzeExecute(CancellationToken ct) {
                 string logFilePath = path.SubPath("test").SubPath("log.txt");
+
+                Task.Delay(500).Wait();
 
                 using(FileStream stream = File.OpenRead(logFilePath)) {
                     StreamReader sr = new StreamReader(stream);
-                    Random random = new Random();
                     string line;
                     string result = "";
                     while ((line = sr.ReadLine()) != null) {

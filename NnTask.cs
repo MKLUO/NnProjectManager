@@ -57,6 +57,9 @@ namespace NnManager {
                     }
                 }
             }
+            protected void SetStatus(string value) {
+                Status = value;
+            }
             #endregion
 
             // [Serializable]
@@ -81,24 +84,6 @@ namespace NnManager {
             [NonSerialized]
             Task task;            
 
-            // [NonSerialized]
-            // NnTaskStatus status;
-            // public NnTaskStatus Status {
-            //     get {
-            //         return status;
-            //     }
-            //     private set {
-            //         if (value != status) {
-            //             status = value;
-            //             OnPropertyChanged("Status");
-            //         }
-            //     }
-            // }
-
-            // public NnTask(
-            //     string content,
-            //     RPath path) : this(content, path, null) { }
-
             public NnTask(
                 string content,
                 RPath path,
@@ -108,7 +93,7 @@ namespace NnManager {
                 this.info = info;
                 this.path = path;
 
-                RegisterModules();
+                //RegisterModules();
                 CurrentModule = null;
                 moduleDone = new HashSet<string>();
             }
@@ -151,11 +136,30 @@ namespace NnManager {
                 private set { }
             }
 
+            void ClearModuleQueue() {
+                string module;
+                while (ModuleQueue.Count > 0) {
+                    ModuleQueue.TryDequeue(out module);
+                }
+            }
+
             public void QueueModule(string moduleName) {
-                if (!modules.ContainsKey(moduleName))
+                if (!Modules.ContainsKey(moduleName))
                     throw new Exception("Module \"" + moduleName + "\" does not exist!");
 
                 ModuleQueue.Enqueue(moduleName);
+            }
+
+            public void ClearModules() {
+                if (IsBusy())
+                    if (Util.WarnAndDecide("Selected task is busy rn. Terminate and clear remaining modules?")) {
+                        ClearModuleQueue();
+                        Terminate();
+                    } else {
+                        return;
+                    }
+                else 
+                    ClearModuleQueue();
             }
 
             public void TryDequeueAndRunModule() {
@@ -166,13 +170,13 @@ namespace NnManager {
                 string modulePoped;
 
                 // if (!IsNotBusy(modulePeeked))
-                if (!IsNotBusy())
+                if (IsBusy())
                     return;
 
                 if (!ModuleQueue.TryPeek(out modulePeeked))
                     return;
 
-                if (!modules[modulePeeked].CanExecute()) {
+                if (!Modules[modulePeeked].CanExecute()) {
                     ModuleQueue.TryDequeue(out modulePeeked);
                     OnPropertyChanged("ModuleQueue");
                     Log("Module \"" + modulePeeked + "\" can't execute!");
@@ -186,47 +190,53 @@ namespace NnManager {
                 Execute(modulePoped);
             }
 
-            public bool IsNotBusy(
+            public bool IsBusy(
                 // string moduleName
             ) {
                 // if (!modules.ContainsKey(moduleName))
                 //     return false;
 
                 if (CurrentModule != null)
-                    return false;
+                    return true;
 
                 if (task != null)
                     if (!task.IsCompleted)
-                        return false;
+                        return true;
 
-                return true;
+                return false;
             }
+
+            [NonSerialized]
+            CancellationTokenSource ts;
 
             public void Execute(
                 string moduleName
             ) {
-                if (!IsNotBusy())
+                if (IsBusy())
                     throw new Exception("Busy!");
 
-                if (!modules[moduleName].CanExecute()) {
+                if (!Modules[moduleName].CanExecute()) {
                     Log("Module \"" + moduleName + "\" can't execute!");
                     return;
                 }
-                    // Returns as if nothing happened (Stateless)
+                // Returns as if nothing happened (Stateless)
+
+                ts = new CancellationTokenSource();
 
                 CurrentModule = moduleName;
-                Log("Module \"" + moduleName + "\" launched...");
+                //Log("Module \"" + moduleName + "\" launched...");
                 task = Task.Run(
                     () => {
                         try {
-                            if (modules[moduleName].Execute()) {
+                            if (Modules[moduleName].Execute(ts.Token)) {
                                 moduleDone.Add(moduleName);
-                                Log("Module \"" + moduleName + "\" successes!");
+                                //Log("Module \"" + moduleName + "\" successes!");
                             } else {
-                                Log("Module \"" + moduleName + "\" failed!");
+                                //Log("Module \"" + moduleName + "\" failed!");
                             }
                         } catch {
-                            throw new Exception("Exception in execution of module \"" + moduleName + "\"!");
+                            // throw new Exception("Exception in execution of module \"" + moduleName + "\"!");
+                            Log("Exception in execution of module \"" + moduleName + "\"!");
                         } finally {
                             CurrentModule = null;
                             Status = null;
@@ -237,16 +247,19 @@ namespace NnManager {
                 );
             }
 
+            public void Terminate() {
+                if (!IsBusy()) return;
+                ts.Cancel();
+            }
+
             public void Restore() {
                 CurrentModule = "Restoring...";
                 task = Task.Run(
                     () => {
                         try {
-                            // Thread.Sleep(500);
                             List<string> moduleDoneRemove = new List<string>();
                             foreach (string moduleName in moduleDone) {
-                                // Thread.Sleep(500);
-                                if (!modules[moduleName].Restore())
+                                if (!Modules[moduleName].Restore())
                                     moduleDoneRemove.Add(moduleName); // Restore fail
                             }
                             foreach (string rmv in moduleDoneRemove) {

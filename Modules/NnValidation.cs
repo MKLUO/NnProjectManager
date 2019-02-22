@@ -1,3 +1,5 @@
+using System.Threading;
+
 namespace NnManager {
     using RPath = Util.RestrictedPath;
 
@@ -15,8 +17,12 @@ namespace NnManager {
                 return true;
             }
 
-            public bool NnValidationExecute() {
-                NnAgent.RunNnStructure(path.SubPath("Validation"));
+            public bool NnValidationExecute(CancellationToken ct) {
+                NnAgent.RunNnStructure(
+                    path.SubPath("Validation"),
+                    content,
+                    ct
+                );
 
                 // TODO: 
                 if (true) // Validation success

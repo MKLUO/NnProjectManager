@@ -7,6 +7,11 @@ using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
+
+#nullable enable
 
 namespace NnManager {
     using RPath = Util.RestrictedPath;
@@ -73,8 +78,9 @@ namespace NnManager {
                 return new RestrictedPath(fullPath);
             }
 
-            RestrictedPath(string path) {
+            RestrictedPath(string path, bool create = true) {
                 this.path = path;
+                if (!create) return;
 
                 string parent = Directory.GetParent(path).ToString();
                 if (!Directory.Exists(parent))
@@ -85,15 +91,14 @@ namespace NnManager {
                 return rPath.path;
             }
 
-            public RestrictedPath SubPath(string folder) {
-                // TODO: check for parent path
+            public RestrictedPath SubPath(string folder, bool create = true) {
                 string resultPath = Path.GetFullPath(path + "\\" + folder);
 
                 if (Directory.GetParent(resultPath).ToString().ToLower() !=
                     new DirectoryInfo(path).ToString().ToLower())
                     throw new Exception("Exception occured in Util.SubPath! (parameter must be single-layered subfolder/file)");
 
-                return new RestrictedPath(resultPath);
+                return new RestrictedPath(resultPath, create);
             }
         }
 
@@ -109,19 +114,30 @@ namespace NnManager {
 
         #endregion
 
-        public static void StartAndWaitProcess(string fileName, string arguments) {
+        public static void StartAndWaitProcess(
+            string fileName,
+            string arguments,
+            CancellationToken ct
+        ) {
             using(Process process = new Process()) {
                 process.StartInfo.FileName = fileName;
                 process.StartInfo.Arguments = arguments;
                 process.StartInfo.UseShellExecute = false;
+
+                ct.Register(() => process.Kill());
 
                 process.Start();
                 process.WaitForExit();
             }
         }
 
+        public static int seed =
+            BitConverter.ToInt32(Guid.NewGuid().ToByteArray(), 0);
+
         public static string RandomString(int length) {
-            Random random = new System.Random();
+            Random random = new System.Random(
+                Interlocked.Increment(ref Util.seed)
+            );
             const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
             return new string(Enumerable.Repeat(chars, length)
@@ -131,7 +147,7 @@ namespace NnManager {
         #region hashing
 
         public static string HashPath(string path) {
-            // TODO:
+            // TODO: better hashing
             string result = "";
             List<string> entries = new List<string>();
 
@@ -172,7 +188,6 @@ namespace NnManager {
         #region serializing
 
         public static void SerializeToFile(Object obj, RPath filePath) {
-            // TODO: File mode?
             using(Stream stream = File.Open(filePath, FileMode.Create)) {
                 BinaryFormatter formatter = new BinaryFormatter();
                 formatter.Serialize(stream, obj);
@@ -180,7 +195,6 @@ namespace NnManager {
         }
 
         public static Object DeserializeFromFile(RPath filePath) {
-            // TODO: 
             using(Stream stream = File.Open(filePath, FileMode.Open)) {
                 BinaryFormatter formatter = new BinaryFormatter();
                 return formatter.Deserialize(stream);
@@ -190,13 +204,24 @@ namespace NnManager {
         #endregion
 
         public static string ParamToTag(Dictionary < string, (string, string) > param) {
-            if (param.Count == 0) return "";
-            
+            if (param.Count == 0)
+                return "";
+
             string result = " (";
             foreach (var pair in param)
                 if (pair.Value.Item1 != null)
                     result += pair.Key + "-" + pair.Value.Item1 + ", ";
             return result.Substring(0, result.Length - 2) + ")";
+        }
+
+        public static string TrimSpaces(this string input) {
+            return Regex.Replace(input, "[ |\t]+", "");
+        }
+
+        public static string[] Splitter(this string input, string delim) {
+            return Regex.Split(input, delim)
+                    .Where(s => s != String.Empty)
+                    .ToArray<string>();
         }
     }
 }
