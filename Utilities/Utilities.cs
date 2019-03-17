@@ -36,12 +36,13 @@ namespace NnManager {
             }
         }
 
+        // FIXME: Option: Force
         public static bool WarnAndDecide(string msg) {
             WarnAndDecideEventHandler handler = warning;
             if (handler != null)
                 return handler(new WarnAndDecideEventArgs(msg));
             else
-                return true;
+                return false;
         }
 
         #endregion
@@ -68,6 +69,15 @@ namespace NnManager {
         [Serializable]
         public class RestrictedPath {
             readonly string path;
+
+            public string? Content {
+                get {
+                    if (File.Exists(path))
+                        using (StreamReader sr = new StreamReader(File.OpenRead(path)))
+                            return sr.ReadToEnd();
+                    else return null;
+                }
+            }
 
             public static RestrictedPath InitRoot(string path) {
                 string fullPath = Path.GetFullPath(path);
@@ -104,13 +114,57 @@ namespace NnManager {
 
         #region log
 
-        // static string log = "";
-        // public static void Log(string msg) {
-        //     log += msg + '\n';
-        // }
-        // public static string GetLog() {
-        //     return log;
-        // }
+        public static CancellationTokenSource StartLogParser<Log>(RPath logFilePath, CancellationToken ct, Action<string?> status)
+            where Log : LogBase, new() {
+            if (!File.Exists(logFilePath))
+                File.Create(logFilePath).Close();
+
+            var tsLog = CancellationTokenSource.CreateLinkedTokenSource(ct);
+
+            Task logTask = Task.Run(
+                () => LogParser<Log>(logFilePath, tsLog.Token, status),
+                tsLog.Token
+            );
+
+            return tsLog;
+        }
+
+        public static void LogParser<Log>(RPath logFilePath, CancellationToken ct, Action<string?> status) 
+            where Log : LogBase, new() {
+            Log log = new Log();
+
+            FileSystemWatcher watcher = new FileSystemWatcher();
+            watcher.Path = Path.GetDirectoryName(logFilePath);
+            watcher.Filter = Path.GetFileName(logFilePath);
+
+            StreamReader sr = new StreamReader(
+                new FileStream(
+                    logFilePath,
+                    FileMode.OpenOrCreate,
+                    FileAccess.Read,
+                    FileShare.ReadWrite
+                )
+            );
+            while (!ct.IsCancellationRequested) {
+                watcher.WaitForChanged(WatcherChangeTypes.All, 1000);
+                while (!sr.EndOfStream) {
+                    string? str = log.Push(sr.ReadLine());
+                    if (str != null) status(str);
+                }
+            }
+            while (!sr.EndOfStream) {
+                string? str = log.Push(sr.ReadLine());
+                if (str != null) status(str);
+            }
+
+            status(null);
+
+            sr.Close();
+        }
+
+        public static void SaveLog(RPath path, string log) {
+            // FIXME:
+        }
 
         #endregion
 
@@ -142,7 +196,7 @@ namespace NnManager {
 
             return new string(Enumerable.Repeat(chars, length)
                 .Select(s => s[random.Next(s.Length)]).ToArray());
-        }
+        }        
 
         #region hashing
 
@@ -215,7 +269,7 @@ namespace NnManager {
         }
 
         public static string TrimSpaces(this string input) {
-            return Regex.Replace(input, "[ |\t]+", "");
+            return Regex.Replace(input, "[ |\t|\r|\n]+", "");
         }
 
         public static string[] Splitter(this string input, string delim) {

@@ -1,85 +1,83 @@
 using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
+#nullable enable
+
 namespace NnManager {
-    using RPath = Util.RestrictedPath;
+    using RPath = Util.RestrictedPath;     
 
-    public partial class Project {
-        public partial class NnTask {
-            public NnModule NnMain {
-                get {
-                    return new NnModule(
-                        NnMainExecute,
-                        NnMainCanExecute,
-                        NnMainRestore);
-                }
-            }
+    partial class NnTask {
 
-            public bool NnMainCanExecute() {
-                // FIXME:
-                // return !moduleDone.Contains("NN Main");
-                return true;
-            }
+        RPath NnMainPath => FSPath;
 
-            public bool NnMainRestore() {
-                // FIXME: Hashing to restore?
-                return Directory.Exists(path.SubPath("main", false));
-            }
+        public NnModule NnMain(ImmutableDictionary<string, string> options) =>
+            new NnModule(
+                "NN Main",
+                NnMainCanExecute, 
+                NnMainIsDone, 
+                NnMainExecute, 
+                NnMainDefaultOption.ToImmutableDictionary(), 
+                options);
 
-            public bool NnMainExecute(CancellationToken ct) {
-                RPath nnMainPath = path.SubPath("main");
-                RPath logFilePath = nnMainPath.SubPath(NnAgent.logFileName);
-                File.Create(logFilePath).Close();
+        // FIXME:
+        public static ImmutableDictionary<string, string> NnMainDefaultOption = 
+            new Dictionary<string, string>().ToImmutableDictionary();
 
-                CancellationTokenSource tsLog = new CancellationTokenSource();
-                Task logTask = Task.Run(
-                    () => LogParser<NnMainLog>(logFilePath, tsLog.Token),
-                    ct
+        bool NnMainCanExecute() {
+            // FIXME: 
+            return true;
+        }
+
+        bool NnMainIsDone() {
+            // FIXME: Do hashing after execution.
+            // return Directory.Exists(path.SubPath("main", false));
+            return true;
+        }
+
+        bool NnMainExecute(CancellationToken ct, ImmutableDictionary<string, string> options) {
+
+            RPath logFilePath = NnMainPath.SubPath(NnAgent.logFileName);
+            
+            var tsLog = Util.StartLogParser<NnMainLog>(logFilePath, ct, SetStatus);
+
+            NnAgent.RunNnStructure(
+                NnMainPath, Content, ct
+            );
+            NnAgent.RunNn(
+                NnMainPath, Content, ct
+            );
+
+            tsLog.Cancel();
+
+            return !ct.IsCancellationRequested;
+        }
+    }
+
+    class NnMainLog : LogBase {
+        int quantumPossionItCount = 0;
+
+        // FIXME: complete it!
+        public override string? Push(string line) {
+            string match;
+            if ((match = Regex.Match(line, @"(Newton step: \d+)").Value) != "") {
+                int newtonStep = Int32.Parse(
+                    Regex.Split(match, " ")
+                    .Where(s => s != String.Empty).ElementAt(2)
                 );
-
-                NnAgent.RunNnStructure(
-                    nnMainPath, content, ct
+                return $"Q.Poisson #{quantumPossionItCount}, Newton #{newtonStep.ToString()}";
+            } else if ((match = Regex.Match(line, @"(QUANTUM-POISSON:  its = \d+)").Value) != "") {
+                quantumPossionItCount = Int32.Parse(
+                    Regex.Split(match, "[ ]+")
+                    .Where(s => s != String.Empty).ElementAt(3)
                 );
-                NnAgent.RunNn(
-                    nnMainPath, content, ct
-                );                
-
-                tsLog.Cancel();
-                logTask.Wait(10000);
-
-                if (ct.IsCancellationRequested) return false;
-                return true;
-            }
-
-            class NnMainLog : LogBase, ILog {
-                public NnMainLog() { }
-                public NnMainLog(Action<string> setStatus) : base(setStatus) { }
-
-                int quantumPossionItCount = 0;
-
-                public void Push(string line) {
-                    string match;
-                    if ((match = Regex.Match(line, @"(Newton step: \d+)").Value) != "") {
-                        int newtonStep = Int32.Parse(
-                            Regex.Split(match, " ")
-                            .Where(s => s != String.Empty).ElementAt(2)
-                        );
-                        SetStatus(
-                            "Q.Poisson #" + quantumPossionItCount.ToString() +
-                            ", Newton #" + newtonStep.ToString()
-                        );
-                    } else if ((match = Regex.Match(line, @"(QUANTUM-POISSON:  its = \d+)").Value) != "") {
-                        quantumPossionItCount = Int32.Parse(
-                            Regex.Split(match, "[ ]+")
-                            .Where(s => s != String.Empty).ElementAt(3)
-                        );
-                    }
-                }
-            }
+                return null;
+            } else return null;
         }
     }
 }

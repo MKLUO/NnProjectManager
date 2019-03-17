@@ -1,284 +1,249 @@
 using System;
+using System.Linq;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Immutable;
+
+#nullable enable
 
 namespace NnManager {
-
     using RPath = Util.RestrictedPath;
+    using ModuleData = Tuple<ModuleType, Dictionary<string, string>>;
 
-    public partial class Project {
+    public partial class NnTask : Notifier, INotifyPropertyChanged {
+
+        public string Name { get; }
+        public RPath FSPath { get; }
+        public string Content { get; }
+
+        string? status;
+        public string? Status {
+            get => status;
+            private set => SetField(ref status, value);
+        }
+        public void SetStatus(string? s) => Status = s;
+
+        ModuleData? currentModule;
+        public ModuleData? CurrentModule {
+            get => currentModule;
+            private set => SetField(ref currentModule, value);
+        }
+
+        List<ModuleData> moduleDone;
+        public IEnumerable<ModuleData> ModuleDone => moduleDone;
+
+        ConcurrentQueue<ModuleData> moduleQueue;
+        public IEnumerable<ModuleData> ModuleQueue => moduleQueue;
+
+        Task? task;
+
+        CancellationTokenSource? ts;
+        CancellationTokenSource Ts =>
+            ts ?? (ts = new CancellationTokenSource());
+
+        public NnTask(
+            string name,
+            RPath path,
+            string content
+        ) : this(name, path, content, new List<ModuleData>(), new List<ModuleData>()) {}
+
+        NnTask(
+            string name,
+            RPath path,
+            string content,
+            List<ModuleData> moduleDone,
+            List<ModuleData> moduleQueue
+        ) {
+            this.Name = name;
+            this.FSPath = path;
+            this.Content = content;
+            this.currentModule = null;
+            this.moduleDone = moduleDone;
+            this.moduleQueue = new ConcurrentQueue<ModuleData>(moduleQueue);
+
+            Save();
+        }
 
         [Serializable]
-        public partial class NnTask : INotifyPropertyChanged {
-            // INFO: NnTask is aware of the directory where actual execution takes place. It stores NN input content and module execution status.
-
-            #region INotifyPropertyChanged
-            [field : NonSerialized]
-            public event PropertyChangedEventHandler PropertyChanged;
-
-            void OnPropertyChanged(string str) {
-                OnPropertyChanged(new PropertyChangedEventArgs(str));
+        struct SaveData {
+            public SaveData(NnTask task) {
+                name = task.Name;
+                content = task.Content;
+                modulesDone = task.moduleDone;
+                moduleQueue = task.moduleQueue.ToList();
             }
+            readonly public string name;
+            readonly public string content;
+            readonly public List<ModuleData> modulesDone;
+            readonly public List<ModuleData> moduleQueue;
+        }
 
-            void OnPropertyChanged(PropertyChangedEventArgs e) {
-                PropertyChangedEventHandler handler = PropertyChanged;
-                if (handler != null)
-                    handler(this, e);
+        public void Save() {
+            Util.SerializeToFile(
+                new SaveData(this),
+                FSPath.SubPath(NnAgent.taskFileName)
+            );
+        }
+
+        public static NnTask? Load(RPath path) {
+            try {
+                var taskData = 
+                    (SaveData) Util.DeserializeFromFile(
+                        path.SubPath(NnAgent.taskFileName)
+                    );
+
+                NnTask newTask = new NnTask(
+                    taskData.name, 
+                    path, 
+                    taskData.content, 
+                    taskData.modulesDone, 
+                    taskData.moduleQueue);                
+
+                newTask.Validation();
+                return newTask;
+
+            } catch {
+                Util.ErrorHappend("Error while loading task!");
+                return null;
             }
-            #endregion
+        }
 
-            #region Log
+        public bool Equals(NnTask task) =>
+            Content == task.Content;
 
-            public delegate void LogFiredEventHandler(NnTask task, string str);
-            [field : NonSerialized]
-            public event LogFiredEventHandler LogFired;
-            void Log(string msg) {
-                LogFiredEventHandler handler = LogFired;
-                if (handler != null)
-                    handler(this, msg);
+        void ClearModuleQueue() {
+            ModuleData module;
+            while (moduleQueue.Count > 0) {
+                moduleQueue.TryDequeue(out module);
             }
+            OnPropertyChanged("ModuleQueue");
+        }
 
-            #endregion
+        public void QueueModule(
+            ModuleData module
+        ) {
+            moduleQueue.Enqueue(module);
+            OnPropertyChanged("ModuleQueue");
+        }
 
-            #region status
-            [NonSerialized]
-            string status;
-            public string Status {
-                get { return status ?? ""; }
-                private set {
-                    if (value != status) {
-                        status = value;
-                        OnPropertyChanged("Status");
-                    }
-                }
-            }
-            protected void SetStatus(string value) {
-                Status = value;
-            }
-            #endregion
-
-            // [Serializable]
-            // public enum NnTaskStatus {
-            //     New,
-            //     Done,
-            //     Error
-            // }
-
-            readonly RPath path;
-            readonly string content;
-
-            // The only stateful data in NnTask
-            HashSet<string> moduleDone;
-
-            Dictionary<string, object> info;
-            public Dictionary<string, object> Info {
-                get { return info; }
-                private set { }
-            }
-
-            [NonSerialized]
-            Task task;            
-
-            public NnTask(
-                string content,
-                RPath path,
-                Dictionary<string, object> info
-            ) {
-                this.content = content;
-                this.info = info;
-                this.path = path;
-
-                //RegisterModules();
-                CurrentModule = null;
-                moduleDone = new HashSet<string>();
-            }
-
-            public void Save() {
-                Util.SerializeToFile(
-                    this,
-                    path.SubPath(NnAgent.taskFileName)
-                );
-            }
-
-            public static NnTask Load(RPath path) {
-                return (NnTask) Util.DeserializeFromFile(
-                    path.SubPath(NnAgent.taskFileName)
-                );
-            }
-
-            [NonSerialized]
-            string currentModule;
-            public string CurrentModule {
-                get {
-                    return currentModule;
-                }
-                private set {
-                    if (value != currentModule)
-                        currentModule = value;
-
-                    OnPropertyChanged("CurrentModule");
-                }
-            }
-
-            [NonSerialized]
-            ConcurrentQueue<string> moduleQueue;
-            public ConcurrentQueue<string> ModuleQueue {
-                get {
-                    if (moduleQueue == null)
-                        moduleQueue = new ConcurrentQueue<string>();
-                    return moduleQueue;
-                }
-                private set { }
-            }
-
-            void ClearModuleQueue() {
-                string module;
-                while (ModuleQueue.Count > 0) {
-                    ModuleQueue.TryDequeue(out module);
-                }
-            }
-
-            public void QueueModule(string moduleName) {
-                if (!Modules.ContainsKey(moduleName))
-                    throw new Exception("Module \"" + moduleName + "\" does not exist!");
-
-                ModuleQueue.Enqueue(moduleName);
-            }
-
-            public void ClearModules() {
-                if (IsBusy())
-                    if (Util.WarnAndDecide("Selected task is busy rn. Terminate and clear remaining modules?")) {
-                        ClearModuleQueue();
-                        Terminate();
-                    } else {
-                        return;
-                    }
-                else 
+        public bool ClearModules() {
+            if (IsBusy())
+                if (Util.WarnAndDecide("Selected task is busy rn. Terminate and clear remaining modules?")) {
                     ClearModuleQueue();
-            }
-
-            public void TryDequeueAndRunModule() {
-                if (ModuleQueue.Count == 0)
-                    return;
-
-                string modulePeeked;
-                string modulePoped;
-
-                // if (!IsNotBusy(modulePeeked))
-                if (IsBusy())
-                    return;
-
-                if (!ModuleQueue.TryPeek(out modulePeeked))
-                    return;
-
-                if (!Modules[modulePeeked].CanExecute()) {
-                    ModuleQueue.TryDequeue(out modulePeeked);
-                    OnPropertyChanged("ModuleQueue");
-                    Log("Module \"" + modulePeeked + "\" can't execute!");
-                    return;
-                }
+                    Terminate();
+                    return true;
+                } else return false;
                 
-                if (!ModuleQueue.TryDequeue(out modulePoped))
-                    return;
-
-                OnPropertyChanged("ModuleQueue");
-                Execute(modulePoped);
+            else {
+                ClearModuleQueue();                
+                return true;
             }
+        }
 
-            public bool IsBusy(
-                // string moduleName
-            ) {
-                // if (!modules.ContainsKey(moduleName))
-                //     return false;
+        public bool TryDequeueAndRunModule() {
+            if (moduleQueue.Count == 0)
+                return false;
 
-                if (CurrentModule != null)
+            if (IsBusy())
+                return false;
+
+            ModuleData modulePeeked;
+            // if (!moduleQueue.TryDequeue(out modulePoped))
+            //     return false;
+            if (!moduleQueue.TryPeek(out modulePeeked))
+                return false;
+            
+            Execute(modulePeeked);
+
+            return true;
+        }
+
+        public bool IsBusy() {
+            if (CurrentModule != null)
+                return true;
+
+            if (task != null)
+                if (!task.IsCompleted)
                     return true;
 
-                if (task != null)
-                    if (!task.IsCompleted)
-                        return true;
+            return false;
+        }
 
-                return false;
-            }
+        public void Execute(
+            ModuleData moduleData
+        ) {
+            if (IsBusy()) return;
 
-            [NonSerialized]
-            CancellationTokenSource ts;
+            NnModule module = GetModule(moduleData.Item1, moduleData.Item2.ToImmutableDictionary());
 
-            public void Execute(
-                string moduleName
-            ) {
-                if (IsBusy())
-                    throw new Exception("Busy!");
+            if (!module.CanExecute()) return;
 
-                if (!Modules[moduleName].CanExecute()) {
-                    Log("Module \"" + moduleName + "\" can't execute!");
-                    return;
+            CurrentModule = moduleData;            
+            OnPropertyChanged("ModuleQueue");
+            task = Task.Run(
+                () => {
+                    try {
+                        ts = new CancellationTokenSource();
+                        if (module.Execute(Ts.Token)) 
+                            // if (!moduleDone.Contains(moduleData)) {
+                            //     moduleDone.Add(module);
+                            //     OnPropertyChanged("ModuleDone");
+                            // }
+                            moduleDone.Add(moduleData);
+
+                        ModuleData? data = null;
+                        while (data == null)
+                            moduleQueue.TryDequeue(out data);
+                    } catch {
+                        //Log("Exception in execution of module \"" + module.Name + "\"!");
+                        ModuleData? data = null;
+                        while (data == null)
+                            moduleQueue.TryDequeue(out data);
+                    } finally {
+                        CurrentModule = null;
+                        Status = null;
+                        OnPropertyChanged("ModuleDone");
+                        OnPropertyChanged("ModuleQueue");
+                    }
+                    Save();
                 }
-                // Returns as if nothing happened (Stateless)
+            );
+        }
 
-                ts = new CancellationTokenSource();
+        public void Terminate() {
+            if (!IsBusy()) return;
+            Ts.Cancel();
+        }
 
-                CurrentModule = moduleName;
-                //Log("Module \"" + moduleName + "\" launched...");
-                task = Task.Run(
-                    () => {
-                        try {
-                            if (Modules[moduleName].Execute(ts.Token)) {
-                                moduleDone.Add(moduleName);
-                                //Log("Module \"" + moduleName + "\" successes!");
-                            } else {
-                                //Log("Module \"" + moduleName + "\" failed!");
-                            }
-                        } catch {
-                            // throw new Exception("Exception in execution of module \"" + moduleName + "\"!");
-                            Log("Exception in execution of module \"" + moduleName + "\"!");
-                        } finally {
-                            CurrentModule = null;
-                            Status = null;
-                        }
-                        // Successful task (NOT necessarily successful module run!)                        
-                        Save();
+        public void Validation() {
+            // CurrentModule = "Validating...";
+            task = Task.Run(
+                () => {
+                    try {
+                        // FIXME: Validation is turned off here
+                        // foreach (NnModule module in 
+                        //     moduleDone.Where(x => !x.IsDone()).ToList()) {
+                        //     moduleDone.Remove(module);
+                        // }
+                    } catch {
+                        Reset();
+                        throw new Exception("Exception in validation!");
+                    } finally {
+                        CurrentModule = null;
                     }
-                );
-            }
+                }
+            );
+        }
 
-            public void Terminate() {
-                if (!IsBusy()) return;
-                ts.Cancel();
-            }
-
-            public void Restore() {
-                CurrentModule = "Restoring...";
-                task = Task.Run(
-                    () => {
-                        try {
-                            List<string> moduleDoneRemove = new List<string>();
-                            foreach (string moduleName in moduleDone) {
-                                if (!Modules[moduleName].Restore())
-                                    moduleDoneRemove.Add(moduleName); // Restore fail
-                            }
-                            foreach (string rmv in moduleDoneRemove) {
-                                moduleDone.Remove(rmv);
-                            }
-                        } catch {
-                            moduleDone.Clear();
-                            throw new Exception("Exception in module restoration!");
-                        } finally {
-                            CurrentModule = null;
-                        }
-                    }
-                );
-            }
-
-            // BLOCKING!
-            public void WaitForTask() {
-                task?.Wait();
-            }
+        public void Reset() {
+            moduleDone.Clear();
+            Save();
         }
     }
 }
