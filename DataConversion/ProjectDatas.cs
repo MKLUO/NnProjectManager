@@ -47,7 +47,7 @@ namespace NnManager {
                 get {
                     foreach (var item in Plan.Tasks) {
                         NnTaskData data = new NnTaskData(item.Value, item.Key);
-                        // Subscribe(data);
+                        Subscribe(data);
                         yield return data;
                     }
                 }
@@ -113,10 +113,12 @@ namespace NnManager {
 
             public void QueueModule(NnModuleForm mData) {
                 foreach (var task in Plan.Tasks.Values) {
-                    task.QueueModule(Tuple.Create(
-                        mData.Type, 
-                        new Dictionary<string, string>(mData.OptionsResult)
-                    ));
+                    task.QueueModule(
+                        new NnModuleRecord(
+                            mData.Type,
+                            mData.OptionsResult
+                        )
+                    );
                 }
             }
 
@@ -163,39 +165,60 @@ namespace NnManager {
                 this.Task == data;
 
             public void QueueModule(NnModuleForm mData) =>
-                Task.QueueModule(Tuple.Create(
-                    mData.Type, 
-                    new Dictionary<string, string>(mData.OptionsResult)
-                ));
+                Task.QueueModule(
+                    new NnModuleRecord(
+                        mData.Type,
+                        mData.OptionsResult
+                    )
+                );
 
             public void ClearModules() => Task.ClearModules();
 
-            public string ModuleDone {
-                get {
-                    string result = "";
-                    foreach (var module in Task.ModuleDone)
-                        result += module.Item1 + " ";
-                    return result;
-                }
-            }
+            // public string ModuleDone {
+            //     get {
+            //         string result = "";
+            //         foreach (var module in Task.ModuleDone)
+            //             result += module.Type.ToString() + " ";
+            //         return result;
+            //     }
+            // }
 
-            public string ModuleQueue {
-                get {
-                    string result = "";
-                    foreach (var module in Task.ModuleQueue)
-                        if (module != Task.CurrentModule)
-                            result += module.Item1 + " ";
+            // public string ModuleQueue {
+            //     get {
+            //         string result = "";
+            //         foreach (var module in Task.ModuleQueue)
+            //             if (module != Task.CurrentModule)
+            //                 result += module.Type.ToString() + " ";
 
-                    return result;
-                }
-            }            
+            //         return result;
+            //     }
+            // }            
 
             public string? CurrentModule => 
                 Task.CurrentModule != null ? 
-                Task.CurrentModule.Item1.ToString() :
+                Task.CurrentModule.Type.ToString() :
                 null;
 
-            public string? Status => Task.Status;
+            public IEnumerable<NnModuleForm> ModuleList {
+                get {
+                    foreach (var module in Task.ModuleDone)
+                        yield return new NnModuleForm(module);
+
+                    if (Task.CurrentModule != null)
+                        yield return new NnModuleForm(Task.CurrentModule);
+
+                    foreach (var module in Task.ModuleQueue)
+                        if (module != Task.CurrentModule)
+                            yield return new NnModuleForm(module);                    
+                }
+            }
+
+            public string? Status => 
+                Task.Status ?? (
+                    Task.IsBusy() ? 
+                    $"Running {CurrentModule}..." :
+                    null
+                );
         }
 
         public class NnTemplateData : 
@@ -237,6 +260,15 @@ namespace NnManager {
         }
 
         public class NnParamForm {
+
+            public bool IsFilled =>
+                (Consts.Count + Variables.Count == 0) ||
+                ((Consts.Where(x => (x.Value ?? x.Default) == null).Count() == 0) &&
+                    (Variables.Where(x => (x.Value ?? x.Default) == null).Count() == 0));
+
+            public bool FixConst { get; }
+            public ImmutableList<Variable> Variables { get; }
+            public ImmutableList<Variable> Consts { get; }
 
             public NnParamForm(
                 ImmutableDictionary<string, double?> variableDefaults,
@@ -282,18 +314,7 @@ namespace NnManager {
                 } catch {
                     return null;
                 }
-            }
-
-            public bool IsFilled =>
-                (Consts.Count + Variables.Count == 0) ||
-                ((Consts.Where(x => (x.Value ?? x.Default) == null).Count() == 0) &&
-                    (Variables.Where(x => (x.Value ?? x.Default) == null).Count() == 0));
-
-            public bool FixConst { get; }
-
-            public ImmutableList<Variable> Variables { get; }
-
-            public ImmutableList<Variable> Consts { get; }
+            }            
         }
 
         public class NnModuleForm {
@@ -306,6 +327,15 @@ namespace NnManager {
                     x => x.Name,
                     x => x.Value ?? x.Default ?? ""
                 );
+
+            public string? Result { get; } 
+
+            public string Tag {
+                get {
+                    if (Result == null) return Type.ToString();
+                    else return $"{Type.ToString()}: {Result}";
+                }
+            }
 
             public NnModuleForm(                
                 ModuleType type
@@ -322,6 +352,23 @@ namespace NnManager {
                             null));
 
                 this.Options = options.ToImmutableList();
+            }
+
+            public NnModuleForm(                
+                NnModuleRecord record
+            ) {
+                this.Type = record.Type;
+
+                var options = new List<Variable>();
+                foreach (var item in NnModule.GetDefaultOptions(record.Type))
+                    options.Add(
+                        new Variable(
+                            item.Key,
+                            item.Value,
+                            record.Options?[item.Key]));
+
+                this.Options = options.ToImmutableList();
+                this.Result = record.Result;
             }
         }
 

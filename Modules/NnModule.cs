@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 namespace NnManager {
     using RPath = Util.RestrictedPath;
         
+    [Serializable]
     public enum ModuleType {
         NnMain,
         NnOccup,
@@ -36,6 +37,26 @@ namespace NnManager {
             return module;
         }
     }
+    
+    [Serializable]
+    public class NnModuleRecord {
+        public ModuleType Type { get; }
+        public Dictionary<string, string> Options { get; }
+        public string? Result { get; private set; }
+
+        public NnModuleRecord(
+            ModuleType type, 
+            ImmutableDictionary<string, string> options,
+            string? result = null
+        ) {
+            Type = type;
+            Options = new Dictionary<string, string>(options);
+            Result = result;
+        }
+
+        public void SetResult(string result) =>
+            Result = result;
+    }
 
     public class NnModule {
         // public abstract string Name { get; }
@@ -59,6 +80,7 @@ namespace NnManager {
             Func<bool> canExecute, 
             Func<bool> isDone, 
             Func<CancellationToken, ImmutableDictionary<string, string>, bool> execute, 
+            Func<string> getResult, 
             ImmutableDictionary<string, string> defaultOptions,
             ImmutableDictionary<string, string>? options = null
         ) {
@@ -66,6 +88,7 @@ namespace NnManager {
             this.canExecute = canExecute;
             this.isDone = isDone;
             this.execute = execute;
+            this.getResult = getResult;
             this.defaultOptions = new Dictionary<string, string>(defaultOptions);
 
             this.options = options != null ?
@@ -100,6 +123,9 @@ namespace NnManager {
                 return execute(ct, newOption.ToImmutableDictionary());
             } else return execute(ct, DefaultOptions);
         }
+
+        Func<string> getResult;
+        public string GetResult() => getResult();
     }
 
     public abstract class LogBase {

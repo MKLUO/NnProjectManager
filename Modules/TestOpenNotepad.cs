@@ -15,6 +15,7 @@ namespace NnManager {
                 () => true,
                 () => true,
                 TestOpenNotepadExecute,
+                () => "",
                 TestOpenNotepadDefaultOption.ToImmutableDictionary(),
                 options);
             

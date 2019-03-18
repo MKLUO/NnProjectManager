@@ -223,19 +223,5 @@ namespace NnManager {
                 if (task.IsBusy()) return true;
             return false;
         }
-
-        NnPlanKernel? kernel; 
-
-        void KernelInitialize() {
-            switch (Type) {
-                case PlanType.NoPlan:
-                    kernel = NoPlan();
-                    return;
-                
-                case PlanType.CBDiamond:
-                    kernel = CBDiamond();
-                    return;
-            }
-        }
     }
 }

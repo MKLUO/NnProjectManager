@@ -22,6 +22,7 @@ namespace NnManager {
                 NnOccupCanExecute, 
                 NnOccupIsDone, 
                 NnOccupExecute, 
+                NnOccupGetResult, 
                 NnOccupDefaultOption.ToImmutableDictionary(),
                 options);
 
@@ -43,6 +44,10 @@ namespace NnManager {
 
         bool NnOccupIsDone() {
             return File.Exists(NnOccupResultPath);
+        }
+
+        string NnOccupGetResult() {
+            return File.ReadAllText(NnOccupResultPath);
         }
 
         bool NnOccupExecute(CancellationToken ct, ImmutableDictionary<string, string> options) {

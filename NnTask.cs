@@ -14,7 +14,6 @@ using System.Collections.Immutable;
 
 namespace NnManager {
     using RPath = Util.RestrictedPath;
-    using ModuleData = Tuple<ModuleType, Dictionary<string, string>>;
 
     public partial class NnTask : Notifier, INotifyPropertyChanged {
 
@@ -29,17 +28,17 @@ namespace NnManager {
         }
         public void SetStatus(string? s) => Status = s;
 
-        ModuleData? currentModule;
-        public ModuleData? CurrentModule {
+        NnModuleRecord? currentModule;
+        public NnModuleRecord? CurrentModule {
             get => currentModule;
             private set => SetField(ref currentModule, value);
         }
 
-        List<ModuleData> moduleDone;
-        public IEnumerable<ModuleData> ModuleDone => moduleDone;
+        List<NnModuleRecord> moduleDone;
+        public IEnumerable<NnModuleRecord> ModuleDone => moduleDone;
 
-        ConcurrentQueue<ModuleData> moduleQueue;
-        public IEnumerable<ModuleData> ModuleQueue => moduleQueue;
+        ConcurrentQueue<NnModuleRecord> moduleQueue;
+        public IEnumerable<NnModuleRecord> ModuleQueue => moduleQueue;
 
         Task? task;
 
@@ -51,21 +50,21 @@ namespace NnManager {
             string name,
             RPath path,
             string content
-        ) : this(name, path, content, new List<ModuleData>(), new List<ModuleData>()) {}
+        ) : this(name, path, content, new List<NnModuleRecord>(), new List<NnModuleRecord>()) {}
 
         NnTask(
             string name,
             RPath path,
             string content,
-            List<ModuleData> moduleDone,
-            List<ModuleData> moduleQueue
+            List<NnModuleRecord> moduleDone,
+            List<NnModuleRecord> moduleQueue
         ) {
             this.Name = name;
             this.FSPath = path;
             this.Content = content;
             this.currentModule = null;
             this.moduleDone = moduleDone;
-            this.moduleQueue = new ConcurrentQueue<ModuleData>(moduleQueue);
+            this.moduleQueue = new ConcurrentQueue<NnModuleRecord>(moduleQueue);
 
             Save();
         }
@@ -80,8 +79,8 @@ namespace NnManager {
             }
             readonly public string name;
             readonly public string content;
-            readonly public List<ModuleData> modulesDone;
-            readonly public List<ModuleData> moduleQueue;
+            readonly public List<NnModuleRecord> modulesDone;
+            readonly public List<NnModuleRecord> moduleQueue;
         }
 
         public void Save() {
@@ -118,18 +117,19 @@ namespace NnManager {
             Content == task.Content;
 
         void ClearModuleQueue() {
-            ModuleData module;
+            NnModuleRecord module;
             while (moduleQueue.Count > 0) {
                 moduleQueue.TryDequeue(out module);
             }
-            OnPropertyChanged("ModuleQueue");
+            // FIXME: COUPLED to view!!!
+            OnPropertyChanged("CollectionModuleQueue");
         }
 
         public void QueueModule(
-            ModuleData module
+            NnModuleRecord module
         ) {
             moduleQueue.Enqueue(module);
-            OnPropertyChanged("ModuleQueue");
+            OnPropertyChanged("CollectionModuleQueue");
         }
 
         public bool ClearModules() {
@@ -153,7 +153,7 @@ namespace NnManager {
             if (IsBusy())
                 return false;
 
-            ModuleData modulePeeked;
+            NnModuleRecord modulePeeked;
             // if (!moduleQueue.TryDequeue(out modulePoped))
             //     return false;
             if (!moduleQueue.TryPeek(out modulePeeked))
@@ -168,48 +168,45 @@ namespace NnManager {
             if (CurrentModule != null)
                 return true;
 
-            if (task != null)
-                if (!task.IsCompleted)
-                    return true;
+            // if (task != null)
+            //     if (!task.IsCompleted)
+            //         return true;
 
             return false;
         }
 
         public void Execute(
-            ModuleData moduleData
+            NnModuleRecord moduleData
         ) {
             if (IsBusy()) return;
 
-            NnModule module = GetModule(moduleData.Item1, moduleData.Item2.ToImmutableDictionary());
+            NnModule module = GetModule(moduleData.Type, moduleData.Options.ToImmutableDictionary());
 
             if (!module.CanExecute()) return;
 
             CurrentModule = moduleData;            
-            OnPropertyChanged("ModuleQueue");
+            OnPropertyChanged("CollectionModuleQueue");
             task = Task.Run(
                 () => {
                     try {
+                        OnPropertyChanged("Status");
                         ts = new CancellationTokenSource();
                         if (module.Execute(Ts.Token)) 
-                            // if (!moduleDone.Contains(moduleData)) {
-                            //     moduleDone.Add(module);
-                            //     OnPropertyChanged("ModuleDone");
-                            // }
-                            moduleDone.Add(moduleData);
-
-                        ModuleData? data = null;
-                        while (data == null)
-                            moduleQueue.TryDequeue(out data);
-                    } catch {
-                        //Log("Exception in execution of module \"" + module.Name + "\"!");
-                        ModuleData? data = null;
-                        while (data == null)
-                            moduleQueue.TryDequeue(out data);
+                            moduleData.SetResult(module.GetResult());
+                        else moduleData.SetResult("(error)");
+                    } catch { 
+                        moduleData.SetResult("(error)");
                     } finally {
+                        NnModuleRecord? data = null;
+                        while (data == null)
+                            moduleQueue.TryDequeue(out data);
+                        moduleDone.Add(data);
+
                         CurrentModule = null;
                         Status = null;
-                        OnPropertyChanged("ModuleDone");
-                        OnPropertyChanged("ModuleQueue");
+
+                        OnPropertyChanged("Status");                        
+                        OnPropertyChanged("CollectionModuleQueue");
                     }
                     Save();
                 }

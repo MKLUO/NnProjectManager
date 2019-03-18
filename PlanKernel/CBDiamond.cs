@@ -22,7 +22,9 @@ namespace NnManager {
         List<NnParam> Window = new List<NnParam>();
         List<NnParam> History = new List<NnParam>();
 
-        // FIXME:
-        void CBDiamondStep() {}
+        // FIXME: CB logic
+        // FIXME: Memory management!
+        void CBDiamondStep() {
+        }
     }
 }

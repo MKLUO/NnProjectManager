@@ -152,6 +152,11 @@ namespace NnManager {
                     string[] tokens =
                         line.Splitter("[$| |\t|=]+");
 
+                    if (defaultValues.ContainsKey(tokens[0])) {
+                        Util.ErrorHappend($"Multiple definition of key \"{tokens[0]}\"!");
+                        return null;
+                    }
+
                     defaultValues.Add(
                         tokens[0],
                         tokens[1]
@@ -186,10 +191,17 @@ namespace NnManager {
                 }
             }
 
+            var inter = variableKeys.Intersect(constKeys);
+            if (inter.Count() != 0) {
+                Util.ErrorHappend($"Same key name \"{inter.First()}\" used in both const- and variable-type value!");
+                return null;
+            }
+
+
             foreach (string key in variableKeys) {
                 variables[key] =
                     defaultValues.ContainsKey(key) ?
-                    Convert.ToDouble(defaultValues[key]) :
+                    Double.Parse(defaultValues[key], System.Globalization.NumberStyles.Float) :
                     (double?) null;
             }
 

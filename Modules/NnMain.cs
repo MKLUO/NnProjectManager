@@ -22,6 +22,8 @@ namespace NnManager {
                 NnMainCanExecute, 
                 NnMainIsDone, 
                 NnMainExecute, 
+                //FIXME: NnMain result
+                () => "?",
                 NnMainDefaultOption.ToImmutableDictionary(), 
                 options);
 
