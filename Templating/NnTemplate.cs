@@ -205,10 +205,11 @@ namespace NnManager {
                     (double?) null;
             }
 
+            // FIXME: hack here. for identifying ## (toggle) 
             foreach (string key in constKeys) {
                 consts[key] =
                     defaultValues.ContainsKey(key) ?
-                    defaultValues[key] :
+                    (defaultValues[key] == "##" ? "" : defaultValues[key]) :
                     (string?) null;
             }
 
