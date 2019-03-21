@@ -27,6 +27,13 @@ namespace NnManager {
             IRefCompare<NnPlanData>, 
             IRefFind<NnPlan>
         {
+            
+            protected override Dictionary<string, List<string>>? Derivatives =>
+                new Dictionary<string, List<string>>
+                {
+                    {"Status", new List<string>{
+                        "BusyTaskAmount"}}
+                };
 
             NnPlan Plan { get; }
             public string Id => Plan.Name;
@@ -146,6 +153,7 @@ namespace NnManager {
             IRefCompare<NnTaskData>, 
             IRefFind<NnTask>
         {
+            
 
             NnTask Task { get; }
             public string Id => Task.Name;
@@ -263,8 +271,14 @@ namespace NnManager {
 
             public bool IsFilled =>
                 (Consts.Count + Variables.Count == 0) ||
-                ((Consts.Where(x => (x.Value ?? x.Default) == null).Count() == 0) &&
-                    (Variables.Where(x => (x.Value ?? x.Default) == null).Count() == 0));
+                (
+                    (Consts.Where(
+                        x => (x.Value ?? x.Default) == null
+                    ).Count() == 0) &&
+                    (Variables.Where(
+                        x => (x.Value ?? x.Default) == null
+                    ).Count() == 0)
+                );
 
             public bool FixConst { get; }
             public ImmutableList<Variable> Variables { get; }

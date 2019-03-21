@@ -211,11 +211,9 @@ namespace NnManager {
 
         // TODO: implement priority here
         public bool DoWork() {
-            kernel?.Step();
-            foreach (var task in tasks.Values)
-                if (task.TryDequeueAndRunModule())
-                    return true;
-            return false;
+            bool suc = kernel?.Step() ?? false;
+            if (suc) OnPropertyChanged("BusyTaskAmount");
+            return suc;
         }
 
         public bool IsBusy() {

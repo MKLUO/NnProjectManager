@@ -285,5 +285,5 @@ namespace NnManager {
 
             return false;
         }
-    }
+    }    
 }

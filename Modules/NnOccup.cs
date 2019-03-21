@@ -47,7 +47,11 @@ namespace NnManager {
         }
 
         string NnOccupGetResult() {
-            return File.ReadAllText(NnOccupResultPath);
+            try {
+                return File.ReadAllText(NnOccupResultPath);
+            } catch {
+                return "(error)";
+            }
         }
 
         bool NnOccupExecute(CancellationToken ct, ImmutableDictionary<string, string> options) {

@@ -148,7 +148,7 @@ namespace NnManager {
                 if (Regex.IsMatch(
                         line,
                         // "[ |\t]*[@|$]default[ |\t]+[0-9|A-Z|a-z|_]+[ |\t]+[0-9|A-Z|a-z|_|\"]+[ |\t]*")) {
-                        "^[ |\t]*\\$[0-9|A-Z|a-z|_]+[ |\t]*=[ |\t]*[0-9|A-Z|a-z|_|.|-]+[ |\t]*")) {
+                        "^[ |\t]*\\$[0-9|A-Z|a-z|_]+[ |\t]*=[ |\t]*[0-9|A-Z|a-z|_|.|\\-|#]+[ |\t]*")) {
                     string[] tokens =
                         line.Splitter("[$| |\t|=]+");
 

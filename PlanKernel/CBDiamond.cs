@@ -24,7 +24,13 @@ namespace NnManager {
 
         // FIXME: CB logic
         // FIXME: Memory management!
-        void CBDiamondStep() {
+        bool CBDiamondStep() {
+
+            // Look for new task completed.
+
+            // Update Window (Discard irrelevent cases and put in good cases)
+
+            return NoPlanStep();            
         }
     }
 }

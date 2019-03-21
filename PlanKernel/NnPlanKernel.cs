@@ -37,7 +37,7 @@ namespace NnManager {
         // protected abstract Dictionary<string, string> Options { get; }
 
         public NnPlanKernel(
-            Action step, 
+            Func<bool> step, 
             Dictionary<string, string>? options = null
         ) {
             this.step = step;
@@ -46,7 +46,7 @@ namespace NnManager {
 
         Dictionary<string, string> Options { get; }
 
-        Action step;
-        public void Step() => step();
+        Func<bool> step;
+        public bool Step() => step();
     }
 }
