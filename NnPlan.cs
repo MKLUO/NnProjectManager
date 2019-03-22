@@ -150,10 +150,11 @@ namespace NnManager {
                     }
 
                 string newContent;
+                string tag = param.GetTag(Template.Variables, Template.Consts);
                 NnTask newTask =
                     new NnTask(
-                        param.GetTag(),
-                        FSPath.SubPath("tasks").SubPath(param.GetTag()),
+                        tag,
+                        FSPath.SubPath("tasks").SubPath(tag),
                         newContent = Template.GenerateContent(param.Content)
                     );
 
@@ -220,6 +221,11 @@ namespace NnManager {
             foreach (NnTask task in tasks.Values)
                 if (task.IsBusy()) return true;
             return false;
+        }
+
+        // FIXME: Ignoring multiple module of same type!
+        public string GetReport(ReportType type, ImmutableDictionary<string, string> options) {
+            return Report(type, options).Execute();
         }
     }
 }

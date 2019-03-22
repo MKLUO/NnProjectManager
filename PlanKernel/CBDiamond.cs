@@ -24,11 +24,14 @@ namespace NnManager {
 
         // FIXME: CB logic
         // FIXME: Memory management!
+        // FIXME: Care! Amount of newly generated tasks shouldn't exceed consumed(?) ones.
         bool CBDiamondStep() {
 
-            // Look for new task completed.
+            // Look for new task completed. (If only few is completed, skip this entire step)
 
             // Update Window (Discard irrelevent cases and put in good cases)
+
+            // Look for new task completed.
 
             return NoPlanStep();            
         }

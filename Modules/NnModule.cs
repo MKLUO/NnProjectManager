@@ -27,11 +27,17 @@ namespace NnManager {
             NnModule module;
             switch (type) {
                 case ModuleType.NnMain:
-                    module = NnMain(options); break;
+                    module = NnMain(
+                        options
+                    ); break;
                 case ModuleType.NnOccup:
-                    module = NnOccup(options); break;
+                    module = NnOccup(
+                        options
+                    ); break;
                 case ModuleType.TestOpenNotepad:
-                    module = TestOpenNotepad(options); break;
+                    module = TestOpenNotepad(
+                        options
+                    ); break;
                 default: throw new Exception();                
             }
             return module;

@@ -133,16 +133,20 @@ namespace NnManager {
         }
 
         public bool ClearModules() {
-            if (IsBusy())
-                if (Util.WarnAndDecide("Selected task is busy rn. Terminate and clear remaining modules?")) {
-                    ClearModuleQueue();
-                    Terminate();
+            try {
+                if (IsBusy())
+                    if (Util.WarnAndDecide("Selected task is busy rn. Terminate and clear remaining modules?")) {
+                        ClearModuleQueue();
+                        Terminate();
+                        return true;
+                    } else return false;
+                    
+                else {
+                    ClearModuleQueue();                
                     return true;
-                } else return false;
-                
-            else {
-                ClearModuleQueue();                
-                return true;
+                }
+            } catch {
+                return false;
             }
         }
 

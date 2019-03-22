@@ -198,7 +198,7 @@ namespace NnManager {
             else throw new ParameterMissingException();
         }
 
-        public string GetTag() {
+        public string GetTag(ImmutableDictionary<string, double?>? variableDef = null, ImmutableDictionary<string, string?>? constDef = null) {
             // if ((variables.Count + consts.Count) == 0)
             //     return "(default)";
             //     // TODO: Default?
@@ -212,15 +212,20 @@ namespace NnManager {
 
             // FIXME: Using only variables here
 
-            if ((variables.Count) == 0)
-                return "(default)";
-                // TODO: Default?
-
             string result = "(";
-            // foreach (var key in consts.Keys)
+            // foreach (var key in consts.Keys) {
+            //     if (constDef != null)
+            //         if (consts[key] == constDef?[key]) continue;
             //     result += $"{key}={consts[key]}, ";
-            foreach (var key in variables.Keys)
+            // }
+            foreach (var key in variables.Keys) {
+                if (variableDef != null)
+                    if (variables[key] == variableDef?[key]) continue;
                 result += $"{key}={variables[key].ToString()}, ";
+            }
+            if (result == "(")
+                return "(default)";
+
             return result.Substring(0, result.Length - 2) + ")";
         }        
     }
