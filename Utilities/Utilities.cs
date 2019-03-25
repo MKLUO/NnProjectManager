@@ -178,7 +178,10 @@ namespace NnManager {
                 process.StartInfo.Arguments = arguments;
                 process.StartInfo.UseShellExecute = false;
 
-                ct.Register(() => process.Kill());
+                ct.Register(() => {
+                    if (!process.HasExited)
+                        process.Kill();
+                });
 
                 process.Start();
                 process.WaitForExit();

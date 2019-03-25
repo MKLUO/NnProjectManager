@@ -52,7 +52,7 @@ namespace NnManager {
 
         public NnModuleRecord(
             ModuleType type, 
-            ImmutableDictionary<string, string> options,
+            Dictionary<string, string> options,
             string? result = null
         ) {
             Type = type;

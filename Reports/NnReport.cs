@@ -19,7 +19,7 @@ namespace NnManager {
     partial class NnPlan {
         NnReport Report(
             ReportType type, 
-            ImmutableDictionary<string, string> options
+            Dictionary<string, string> options
         ) {
             NnReport report;
             switch (type) {
@@ -36,7 +36,7 @@ namespace NnManager {
         public static ImmutableDictionary<string, string> GetDefaultOptions(ReportType type) {
             switch (type) {
                 case ReportType.Occup2D:
-                    return NnPlan.NnReportOccup2DDefaultOption;
+                    return NnPlan.NnReportOccup2DDefaultOption.ToImmutableDictionary();
                 default: throw new Exception();
             }
         }        
@@ -44,8 +44,8 @@ namespace NnManager {
         public NnReport(
             string name,
             Func<ImmutableDictionary<string, string>, string> execute,
-            ImmutableDictionary<string, string> defaultOptions,
-            ImmutableDictionary<string, string>? options = null
+            Dictionary<string, string> defaultOptions,
+            Dictionary<string, string>? options = null
         ) {
             this.Name = name;
             this.execute = execute;

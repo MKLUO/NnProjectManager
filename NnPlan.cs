@@ -224,7 +224,7 @@ namespace NnManager {
         }
 
         // FIXME: Ignoring multiple module of same type!
-        public string GetReport(ReportType type, ImmutableDictionary<string, string> options) {
+        public string GetReport(ReportType type, Dictionary<string, string> options) {
             return Report(type, options).Execute();
         }
     }

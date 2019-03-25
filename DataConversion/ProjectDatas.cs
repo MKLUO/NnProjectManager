@@ -123,7 +123,7 @@ namespace NnManager {
                     task.QueueModule(
                         new NnModuleRecord(
                             mData.Type,
-                            mData.OptionsResult
+                            new Dictionary<string, string>(mData.OptionsResult)
                         )
                     );
                 }
@@ -133,6 +133,61 @@ namespace NnManager {
                 foreach (var task in Plan.Tasks.Values) {
                     task.ClearModules();
                 }
+            }
+
+            // FIXME:  HACK!
+            public void Nuke0323() {
+                foreach (var task in Plan.Tasks.Values) {
+                    if (task.ModuleDone.Where(x => x.Type == ModuleType.NnMain).Count() == 0)
+                    if (task.ModuleQueue.Where(x => x.Type == ModuleType.NnMain).Count() == 0)
+                        task.QueueModule(
+                            new NnModuleRecord(
+                                ModuleType.NnMain,
+                                new Dictionary<string, string>{}
+                            )
+                        );
+                }
+
+                NnModuleRecord? occupRecord = null;
+
+                foreach (var task in Plan.Tasks.Values) {
+                    if (task.ModuleDone.Where(x => x.Type == ModuleType.NnOccup).Count() != 0) {
+                        occupRecord = task.ModuleDone.Where(x => x.Type == ModuleType.NnOccup).First();
+                        break;
+                    }
+                    if (task.ModuleQueue.Where(x => x.Type == ModuleType.NnOccup).Count() != 0) {
+                        occupRecord = task.ModuleQueue.Where(x => x.Type == ModuleType.NnOccup).First();
+                        break;
+                    }
+                }
+
+                if (occupRecord == null) return;
+                
+                foreach (var task in Plan.Tasks.Values) {  
+                    if (task.ModuleDone.Where(x => x.Type == ModuleType.NnOccup).Count() == 0)
+                    if (task.ModuleQueue.Where(x => x.Type == ModuleType.NnOccup).Count() == 0)  
+                        task.QueueModule(
+                            occupRecord
+                        );
+                }                
+            }
+            // FIXME:  HACK!
+            public void GenerateTReport0323() {
+                string result = Plan.GetReport(ReportType.Occup2D, new Dictionary<string, string>{
+                    {"X", "T"},
+                    {"Y", "vol_TD"}
+                });
+
+                File.WriteAllText(Plan.FSPath.SubPath("TReport0323.txt"), result);
+            }
+            // FIXME:  HACK!
+            public void GenerateBReport0323() {
+                string result = Plan.GetReport(ReportType.Occup2D, new Dictionary<string, string>{
+                    {"X", "B"},
+                    {"Y", "vol_TD"}
+                });
+
+                File.WriteAllText(Plan.FSPath.SubPath("BReport0323.txt"), result);
             }
 
             public int TaskAmount =>
@@ -176,7 +231,7 @@ namespace NnManager {
                 Task.QueueModule(
                     new NnModuleRecord(
                         mData.Type,
-                        mData.OptionsResult
+                        new Dictionary<string, string>(mData.OptionsResult)
                     )
                 );
 

@@ -14,19 +14,19 @@ namespace NnManager {
 
     partial class NnPlan {
 
-        public NnReport NnReportOccup2D(ImmutableDictionary<string, string> options) =>
+        public NnReport NnReportOccup2D(Dictionary<string, string> options) =>
             new NnReport(
                 "Occup2D",
                 NnReportOccup2DExecute, 
-                NnReportOccup2DDefaultOption.ToImmutableDictionary(), 
+                NnReportOccup2DDefaultOption, 
                 options);
 
         // FIXME:
-        public static ImmutableDictionary<string, string> NnReportOccup2DDefaultOption = 
+        public static Dictionary<string, string> NnReportOccup2DDefaultOption = 
             new Dictionary<string, string>{
                 {"X", "-"},
                 {"Y", "-"}
-            }.ToImmutableDictionary();
+            };
 
         string NnReportOccup2DExecute(ImmutableDictionary<string, string> options) {
 
@@ -42,7 +42,7 @@ namespace NnManager {
                 var records = task.ModuleDone.Where(x => x.Type == ModuleType.NnOccup);
                 if (records.Count() == 0) continue;                
 
-                result += $"{param.Variables[xTag]},{param.Variables[yTag]},{records.First().Result}";
+                result += $"\r\n{param.Variables[xTag]},{param.Variables[yTag]},{records.Last().Result}";
             }
 
             return result;
