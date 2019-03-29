@@ -13,8 +13,14 @@ namespace NnManager {
     using RPath = Util.RestrictedPath;
 
     [Serializable]
-    public class NnTemplate {
+    public enum NnType {
+        Nn3,
+        NnPP
+    }   
 
+
+    [Serializable]
+    public class NnTemplate {        
         public string Name { get; }
         public RPath FSPath { get; }
         List<Element> Elements { get; }
@@ -131,7 +137,8 @@ namespace NnManager {
         public static NnTemplate? NewTemplate(
             string name,
             string content,
-            RPath path
+            RPath path,
+            NnType type
         ) {
             List<Element> elements = new List<Element>();
 
@@ -145,6 +152,7 @@ namespace NnManager {
             List<string> variableKeys = new List<string>();
             List<string> constKeys = new List<string>();
             foreach (string line in lines) {
+                // FIXME: nested variable evaluation!
                 if (Regex.IsMatch(
                         line,
                         // "[ |\t]*[@|$]default[ |\t]+[0-9|A-Z|a-z|_]+[ |\t]+[0-9|A-Z|a-z|_|\"]+[ |\t]*")) {

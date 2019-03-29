@@ -237,6 +237,10 @@ namespace NnManager {
 
             public void ClearModules() => Task.ClearModules();
 
+            public void Launch() => Task.TryDequeueAndRunModule();
+
+            public void Terminate() => Task.Terminate();
+
             // public string ModuleDone {
             //     get {
             //         string result = "";

@@ -220,6 +220,8 @@ namespace NnManager {
         public void Terminate() {
             if (!IsBusy()) return;
             Ts.Cancel();
+            OnPropertyChanged("Status");                        
+            OnPropertyChanged("CollectionModuleQueue");
         }
 
         public void Validation() {
