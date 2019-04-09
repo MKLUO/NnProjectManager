@@ -49,10 +49,10 @@ namespace NnManager {
             var tsLog = Util.StartLogParser<NnMainLog>(logFilePath, ct, SetStatus);
 
             NnAgent.RunNnStructure(
-                NnMainPath, Content, ct
+                NnMainPath, Content, ct, Type
             );
             NnAgent.RunNn(
-                NnMainPath, Content, ct
+                NnMainPath, Content, ct, Type
             );
 
             tsLog.Cancel();

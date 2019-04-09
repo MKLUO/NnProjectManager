@@ -27,23 +27,16 @@ namespace NnManager {
                 base(message, inner) { }
         }
 
-        Dictionary<string, double> variables;
-        public ReadOnlyDictionary<string, double> Variables { 
-            get {
-                return new ReadOnlyDictionary<string, double>(variables);
-            } 
-        }
-        Dictionary<string, string> consts;
-        public ReadOnlyDictionary<string, string> Consts { 
-            get {
-                return new ReadOnlyDictionary<string, string>(consts);
-            } 
-        }
+        Dictionary<string, string> variables;
+        public ImmutableDictionary<string, string> Variables => 
+            variables.ToImmutableDictionary();
 
+        public string? GetValue(string key) =>
+            variables?[key];
+            
         public NnParam(
-            Dictionary<string, double> variables,
-            Dictionary<string, string> consts) {
-            (this.variables, this.consts) = (variables, consts);
+            Dictionary<string, string> variables) {
+            this.variables = variables;
         }
 
         // TODO: Excel input?
@@ -96,21 +89,29 @@ namespace NnManager {
                 if (paramData.Count != paramTag.Count)
                     continue;       
 
+                Dictionary<string, string> param = new Dictionary<string, string>();
+                for (int i = 0; i < paramTag.Count; ++i)
+                    param[paramTag[i]] = paramData[i];
+                foreach (var item in consts)
+                    param[item.Key] = item.Value;
+
+
                 result.Add(
-                    new NnParam(
-                        paramTag.Zip(
-                            paramData, 
-                            (string x, string y) => new {
-                                k=x, 
-                                v=Double.Parse(
-                                    y, System.Globalization.NumberStyles.Float
-                                )
-                            }).ToDictionary(x => {
-                                if (x.k == null) throw new NullReferenceException();
-                                return x.k;
-                            }, x => x.v),
-                        consts
-                    )
+                    new NnParam(param)
+                    // new NnParam(
+                    //     paramTag.Zip(
+                    //         paramData, 
+                    //         (string x, string y) => new {
+                    //             k=x, 
+                    //             v=Double.Parse(
+                    //                 y, System.Globalization.NumberStyles.Float
+                    //             )
+                    //         }).ToDictionary(x => {
+                    //             if (x.k == null) throw new NullReferenceException();
+                    //             return x.k;
+                    //         }, x => x.v),
+                    //     consts
+                    // )
                 );
             }
             return result;
@@ -123,24 +124,12 @@ namespace NnManager {
                         variables[key] = template.Variables[key] ?? throw new Exception();
                     else return false;
             }
-            foreach (var key in template.Consts.Keys) {
-                if (!consts.ContainsKey(key))
-                    if (template.Consts[key] != null)
-                        consts[key] = template.Consts[key] ?? throw new Exception();
-                    else return false;                    
-            }
             return true;
         }
 
-        public static bool HasConsts(NnParam p1, IEnumerable<KeyValuePair<string, string>> consts) =>
-            p1.consts.OrderBy(x => x.Key).SequenceEqual(
-                consts.OrderBy(x => x.Key));
-
         public static bool HasSameSignature(NnParam p1, NnParam p2) =>
             p1.variables.Keys.OrderBy(x => x).SequenceEqual(
-                p2.variables.Keys.OrderBy(x => x)) &&
-            p1.consts.OrderBy(x => x.Key).SequenceEqual(
-                p2.consts.OrderBy(x => x.Key));
+                p2.variables.Keys.OrderBy(x => x));
 
         public static bool AreSame(NnParam p1, NnParam p2) {
             if (!HasSameSignature(p1, p2))
@@ -148,76 +137,40 @@ namespace NnManager {
             foreach (string key in p1.variables.Keys)
                 if (p1.variables[key] != p2.variables[key])
                     return false;
-            foreach (string key in p1.consts.Keys)
-                if (p1.consts[key] != p2.consts[key])
-                    return false;
-
             return true;
         }
 
-        public static NnParam operator /(NnParam nnParam, double value) => (1.0 / value) * nnParam;
-        public static NnParam operator *(NnParam nnParam, double value) => value * nnParam;
-        public static NnParam operator *(double value, NnParam nnParam) {
-            Dictionary<string, double> newVariables = new Dictionary<string, double>();
-            foreach (string key in nnParam.variables.Keys)
-                newVariables[key] = nnParam.variables[key] * value;
+        // FIXME: Generation of new NnParam should be binary
+        // Whether variable should be converted or being checked for matches is determined dynamically.
 
-            return new NnParam(newVariables, nnParam.consts);
-        }
+        // public static NnParam operator /(NnParam nnParam, double value) => (1.0 / value) * nnParam;
+        // public static NnParam operator *(NnParam nnParam, double value) => value * nnParam;
+        // public static NnParam operator *(double value, NnParam nnParam) {
+        //     Dictionary<string, double> newVariables = new Dictionary<string, double>();
+        //     foreach (string key in nnParam.variables.Keys)
+        //         newVariables[key] = nnParam.variables[key] * value;
 
-        public static NnParam operator -(NnParam left, NnParam right) => left + (-1) * right;
-        public static NnParam operator +(NnParam left, NnParam right) {
-            if (!HasSameSignature(left, right))
-                throw new SignatureMismatchException();
+        //     return new NnParam(newVariables, nnParam.consts);
+        // }
 
-            Dictionary<string, double> newVars = new Dictionary<string, double>();
+        // public static NnParam operator -(NnParam left, NnParam right) => left + (-1) * right;
+        // public static NnParam operator +(NnParam left, NnParam right) {
+        //     if (!HasSameSignature(left, right))
+        //         throw new SignatureMismatchException();
 
-            foreach (var key in left.variables.Keys)
-                newVars[key] = left.variables[key] + right.variables[key];
+        //     Dictionary<string, double> newVars = new Dictionary<string, double>();
 
-            return new NnParam(newVars, left.consts);
-        }
+        //     foreach (var key in left.variables.Keys)
+        //         newVars[key] = left.variables[key] + right.variables[key];
 
-        public Dictionary<string, string> Content {
-            get {
-                var result = new Dictionary<string, string>();
-                foreach (string key in variables.Keys)
-                    result[key] = variables[key].ToString();
-                foreach (string key in consts.Keys)
-                    result[key] = consts[key];
+        //     return new NnParam(newVars, left.consts);
+        // }    
 
-                return result;
-            }
-        }
-
-        public string Get(string key) {
-            if (variables.ContainsKey(key))
-                return variables[key].ToString();
-            else if (consts.ContainsKey(key))
-                return consts[key];
-            else throw new ParameterMissingException();
-        }
-
-        public string GetTag(ImmutableDictionary<string, double?>? variableDef = null, ImmutableDictionary<string, string?>? constDef = null) {
-            // if ((variables.Count + consts.Count) == 0)
-            //     return "(default)";
-            //     // TODO: Default?
-
-            // string result = "(";
-            // foreach (var key in consts.Keys)
-            //     result += $"{key}={consts[key]}, ";
-            // foreach (var key in variables.Keys)
-            //     result += $"{key}={variables[key].ToString()}, ";
-            // return result.Substring(0, result.Length - 2) + ")";
-
+        public string GetTag(ImmutableDictionary<string, string?>? variableDef = null) {
             // FIXME: Using only variables here
 
             string result = "(";
-            // foreach (var key in consts.Keys) {
-            //     if (constDef != null)
-            //         if (consts[key] == constDef?[key]) continue;
-            //     result += $"{key}={consts[key]}, ";
-            // }
+
             foreach (var key in variables.Keys) {
                 if (variableDef != null)
                     if (variables[key] == variableDef?[key]) continue;

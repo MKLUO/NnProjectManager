@@ -12,6 +12,8 @@ namespace NnManager {
     public static class NnAgent {
         // TODO: Check for NN exe 
         readonly static string nnMainPath = "C:\\Program Files (x86)\\nextnano\\2015_08_19\\";
+        readonly static string nnPPPath = "nextnano++\\bin 64bit\\nextnano++_Intel_64bit.exe";
+        readonly static string nn3Path = "nextnano3\\Intel 64bit\\nextnano3_Intel_64bit.exe";
         readonly public static string inputFileName = "nnInput.in";
         readonly public static string logFileName = "nnInput.log";
         readonly public static string projFileName = "nnProj";
@@ -19,14 +21,21 @@ namespace NnManager {
         readonly public static string planFileName = "nnPlan";
         readonly public static string taskFileName = "nnTask";
 
-        public static void RunNnStructure(RPath path, string content, CancellationToken ct) {
+        public static void RunNnStructure(RPath path, string content, CancellationToken ct, NnType type) {
             try {
                 File.WriteAllText(
                     path.SubPath(inputFileName),
                     content);
 
+                string exePath = "";
+                switch (type) {
+                    case NnType.Nn3: exePath = nn3Path; break;
+                    case NnType.NnPP: exePath = nnPPPath; break;
+                }
+                if (exePath == "") throw new Exception();
+                
                 Util.StartAndWaitProcess(
-                    nnMainPath + "nextnano++\\bin 64bit\\nextnano++_Intel_64bit.exe",
+                    nnMainPath + exePath,
                     " -s --license \"" + nnMainPath + "License\\license.txt\"" +
                     " --database \"" + nnMainPath + "nextnano++\\Syntax\\database_nnp.in\"" +
                     " --outputdirectory \"" + path + "\"" +
@@ -42,14 +51,21 @@ namespace NnManager {
             }
         }
 
-        public static void RunNn(RPath path, string content, CancellationToken ct) {
+        public static void RunNn(RPath path, string content, CancellationToken ct, NnType type) {
             try {
                 File.WriteAllText(
                     path.SubPath(inputFileName),
                     content);
 
+                string exePath = "";
+                switch (type) {
+                    case NnType.Nn3: exePath = nn3Path; break;
+                    case NnType.NnPP: exePath = nnPPPath; break;
+                }
+                if (exePath == "") throw new Exception();
+
                 Util.StartAndWaitProcess(
-                    nnMainPath + "nextnano++\\bin 64bit\\nextnano++_Intel_64bit.exe",
+                    nnMainPath + exePath,
                     " --license \"" + nnMainPath + "License\\license.txt\"" +
                     " --database \"" + nnMainPath + "nextnano++\\Syntax\\database_nnp.in\"" +
                     " --outputdirectory \"" + path + "\"" +

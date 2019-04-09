@@ -18,6 +18,7 @@ namespace NnManager {
     public partial class NnTask : Notifier, INotifyPropertyChanged {
 
         public string Name { get; }
+        public NnType Type { get; }
         public RPath FSPath { get; }
         public string Content { get; }
 
@@ -48,18 +49,21 @@ namespace NnManager {
 
         public NnTask(
             string name,
+            NnType type,
             RPath path,
             string content
-        ) : this(name, path, content, new List<NnModuleRecord>(), new List<NnModuleRecord>()) {}
+        ) : this(name, type, path, content, new List<NnModuleRecord>(), new List<NnModuleRecord>()) {}
 
         NnTask(
             string name,
+            NnType type,
             RPath path,
             string content,
             List<NnModuleRecord> moduleDone,
             List<NnModuleRecord> moduleQueue
         ) {
             this.Name = name;
+            this.Type = type;
             this.FSPath = path;
             this.Content = content;
             this.currentModule = null;
@@ -73,11 +77,13 @@ namespace NnManager {
         struct SaveData {
             public SaveData(NnTask task) {
                 name = task.Name;
+                type = task.Type;
                 content = task.Content;
                 modulesDone = task.moduleDone;
                 moduleQueue = task.moduleQueue.ToList();
             }
             readonly public string name;
+            readonly public NnType type;
             readonly public string content;
             readonly public List<NnModuleRecord> modulesDone;
             readonly public List<NnModuleRecord> moduleQueue;
@@ -99,6 +105,7 @@ namespace NnManager {
 
                 NnTask newTask = new NnTask(
                     taskData.name, 
+                    taskData.type, 
                     path, 
                     taskData.content, 
                     taskData.modulesDone, 

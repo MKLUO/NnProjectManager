@@ -18,14 +18,13 @@ namespace NnManager {
         NnPP
     }   
 
-
     [Serializable]
     public class NnTemplate {        
         public string Name { get; }
+        public NnType Type { get; }
         public RPath FSPath { get; }
         List<Element> Elements { get; }
-        public ImmutableDictionary<string, double?> Variables { get; }
-        public ImmutableDictionary<string, string?> Consts { get; }
+        public ImmutableDictionary<string, string?> Variables { get; }
 
         [Serializable]
         class Element {
@@ -71,17 +70,17 @@ namespace NnManager {
         }
 
         NnTemplate(
-                string name,
-                RPath path,
-                List<Element> elements,
-                ImmutableDictionary<string, double?> variables,
-                ImmutableDictionary<string, string?> consts
+            string name,
+            NnType type,
+            RPath path,
+            List<Element> elements,
+            ImmutableDictionary<string, string?> variables
         ) {
             this.Name = name;
+            this.Type = type;
             this.FSPath = path;
             this.Elements = elements;
             this.Variables = variables;
-            this.Consts = consts;
             
             Save();
         }
@@ -92,15 +91,15 @@ namespace NnManager {
         struct SaveData {
             public SaveData(NnTemplate temp) {
                 name = temp.Name;
+                type = temp.Type;
                 elements = temp.Elements;
-                variables = new Dictionary<string, double?>(temp.Variables);
-                consts = new Dictionary<string, string?>(temp.Consts);
+                variables = new Dictionary<string, string?>(temp.Variables);
             }
 
             readonly public string name;
+            readonly public NnType type;
             readonly public List<Element> elements;
-            public Dictionary<string, double?> variables;
-            public Dictionary<string, string?> consts;
+            public Dictionary<string, string?> variables;
         }
 
         public void Save(RPath? path = null) {
@@ -121,10 +120,10 @@ namespace NnManager {
 
                 NnTemplate temp = new NnTemplate(
                     tempData.name,
+                    tempData.type,
                     path,
                     tempData.elements,
-                    tempData.variables.ToImmutableDictionary(),
-                    tempData.consts.ToImmutableDictionary()
+                    tempData.variables.ToImmutableDictionary()
                 );
 
                 return temp;
@@ -137,28 +136,43 @@ namespace NnManager {
         public static NnTemplate? NewTemplate(
             string name,
             string content,
-            RPath path,
-            NnType type
+            RPath path
         ) {
             List<Element> elements = new List<Element>();
 
             string[] lines =
                 content.Splitter("([\r\n|\r|\n]+)");
 
+            // Test parse (to identify NnType)
+            NnType type = NnType.Nn3;
+            foreach (string line in lines)
+                if (Regex.IsMatch(line, @"^[ |\t]*}.*")) {
+                    type = NnType.NnPP; break;
+                }
+
+            string tokenVariable = "\\$", tokenComment = "#";
+            switch (type) {
+                case NnType.Nn3:
+                    tokenVariable = "%";
+                    tokenComment = "!";
+                break;
+                case NnType.NnPP:
+                    tokenVariable = "\\$";
+                    tokenComment = "#";
+                break;
+            }
+
             Dictionary<string, string> defaultValues = new Dictionary<string, string>();
-            Dictionary<string, double?> variables = new Dictionary<string, double?>();
-            Dictionary<string, string?> consts = new Dictionary<string, string?>();
+            Dictionary<string, string?> variables = new Dictionary<string, string?>();
 
             List<string> variableKeys = new List<string>();
-            List<string> constKeys = new List<string>();
             foreach (string line in lines) {
                 // FIXME: nested variable evaluation!
                 if (Regex.IsMatch(
                         line,
-                        // "[ |\t]*[@|$]default[ |\t]+[0-9|A-Z|a-z|_]+[ |\t]+[0-9|A-Z|a-z|_|\"]+[ |\t]*")) {
-                        "^[ |\t]*\\$[0-9|A-Z|a-z|_]+[ |\t]*=[ |\t]*[0-9|A-Z|a-z|_|.|\\-|#]+[ |\t]*")) {
+                        $"^[ \\t]*{tokenVariable}[0-9A-Za-z_]+[ \\t]*=[ \\t]*[0-9A-Za-z_.\\-{tokenComment}]+[ \\t]*")) {
                     string[] tokens =
-                        line.Splitter("[$| |\t|=]+");
+                        line.Splitter($"[{tokenVariable}| |\t|=]+");
 
                     if (defaultValues.ContainsKey(tokens[0])) {
                         Util.ErrorHappend($"Multiple definition of key \"{tokens[0]}\"!");
@@ -172,26 +186,26 @@ namespace NnManager {
                 // TODO: Refactor these into a NnTemplate parsing logic.
                 } else {
                     // FIXME: also discard other output dirs!
-                    if (Regex.IsMatch(line, "[ |\t]*directory[ |\t]*=.*"))
-                            if (!Util.WarnAndDecide("The output directory specification in template file will be discarded.\nContinue parsing?")) {
+                    if (Regex.IsMatch(line, "[ \t]*directory[ \t]*=.*"))
+                            if (!Util.WarnAndDecide($"The output directory specification {line} in template file will be discarded.\nContinue parsing?")) {
                                 return null;
                             } else continue;
 
                     string[] tokens =
-                        line.Splitter("(#.*$)|([@|$][0-9|A-Z|a-z|_]+)");
+                        line.Splitter($"(#.*$)|({tokenVariable}[0-9A-Za-z_]+)");
 
                     foreach (string token in tokens) {
                         string vari;
-                        if (token[0] == '#') {
+                        if (token[0] == tokenComment.Last()) {
                             elements.Add(Element.NewContent(token));
-                        } else if (token[0] == '@') {
+                        } else if (token[0] == tokenVariable.Last()) {
                             vari = token.Substring(1);
                             variableKeys.Add(vari);
                             elements.Add(Element.NewVariable(vari));
-                        } else if (token[0] == '$') {
-                            vari = token.Substring(1);
-                            constKeys.Add(vari);
-                            elements.Add(Element.NewVariable(vari));
+                        // } else if (token[0] == '$') {
+                        //     vari = token.Substring(1);
+                        //     constKeys.Add(vari);
+                        //     elements.Add(Element.NewVariable(vari));
                         } else {
                             elements.Add(Element.NewContent(token));
                         }
@@ -199,23 +213,9 @@ namespace NnManager {
                 }
             }
 
-            var inter = variableKeys.Intersect(constKeys);
-            if (inter.Count() != 0) {
-                Util.ErrorHappend($"Same key name \"{inter.First()}\" used in both const- and variable-type value!");
-                return null;
-            }
-
-
+            // FIXME: hack here. for identifying ## (toggle) 
             foreach (string key in variableKeys) {
                 variables[key] =
-                    defaultValues.ContainsKey(key) ?
-                    Double.Parse(defaultValues[key], System.Globalization.NumberStyles.Float) :
-                    (double?) null;
-            }
-
-            // FIXME: hack here. for identifying ## (toggle) 
-            foreach (string key in constKeys) {
-                consts[key] =
                     defaultValues.ContainsKey(key) ?
                     (defaultValues[key] == "##" ? "" : defaultValues[key]) :
                     (string?) null;
@@ -223,10 +223,11 @@ namespace NnManager {
 
             return new NnTemplate(
                 name, 
+                type,
                 path,
                 elements, 
-                variables.ToImmutableDictionary(), 
-                consts.ToImmutableDictionary());
+                variables.ToImmutableDictionary()
+            );
         }
 
         // public bool Equals(NnTemplate temp) =>
@@ -239,7 +240,7 @@ namespace NnManager {
 
         public string GenerateContent(
             // NnParam param) {
-            Dictionary<string, string> param) {
+            ImmutableDictionary<string, string> param) {
             string result = "";
 
             foreach (Element element in Elements) {

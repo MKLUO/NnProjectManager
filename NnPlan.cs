@@ -18,7 +18,7 @@ namespace NnManager {
         public RPath FSPath { get; }
         public NnTemplate Template { get; }
         public PlanType Type { get; }
-        public ImmutableDictionary<string, string> ? Consts { get; private set; }
+        // public ImmutableDictionary<string, string> ? Consts { get; private set; }
 
         Dictionary<NnParam, NnTask> tasks;
         // public IEnumerable<NnTask> Tasks => tasks.Values;
@@ -50,14 +50,14 @@ namespace NnManager {
             RPath path,
             NnTemplate template,
             Dictionary<NnParam, NnTask> tasks,
-            ImmutableDictionary<string, string> ? consts,
+            // ImmutableDictionary<string, string> ? consts,
             PlanType type
         ) {
             this.Name = name;
             this.FSPath = path;
             this.Template = template;
             this.tasks = tasks;
-            this.Consts = consts;
+            // this.Consts = consts;
             this.Type = type;
 
             KernelInitialize();
@@ -73,15 +73,15 @@ namespace NnManager {
                 name = plan.Name;
                 Type = plan.Type;
                 taskIds = plan.tasks.ToDictionary(x => x.Key, x => x.Value.Name);                
-                consts = plan.Consts != null ?
-                    new Dictionary<string, string>(plan.Consts) :
-                    null;
+                // consts = plan.Consts != null ?
+                //     new Dictionary<string, string>(plan.Consts) :
+                //     null;
             }
 
             readonly public string name;
             readonly public PlanType Type;
             readonly public Dictionary<NnParam, string> taskIds;
-            readonly public Dictionary<string, string> ? consts;
+            // readonly public Dictionary<string, string> ? consts;
         }
 
         void Save() {
@@ -118,7 +118,7 @@ namespace NnManager {
                     path,
                     template,
                     tasks,
-                    planData.consts?.ToImmutableDictionary(),
+                    // planData.consts?.ToImmutableDictionary(),
                     planData.Type
                 );
 
@@ -132,50 +132,58 @@ namespace NnManager {
 
         public NnTask? AddTask(
             NnParam param
+        ) => AddTask(new List<NnParam>{param});
+
+        public List<NnTask> AddTask(
+            List<NnParam> pars
         ) {
+            var newTasks = new Dictionary<NnParam, NnTask>();
             try {
-                if (!param.Pad(Template))
-                    return null;
+                foreach (var param in pars) {    
+                    if (!param.Pad(Template))
+                        continue;
 
-                if (Consts != null)
-                    if (!NnParam.HasConsts(param, Consts)) {
-                        Util.ErrorHappend("Constants in parameter mismatch!");
-                        return null;
-                    }
+                    foreach (var task in tasks)
+                        if (task.Key.GetTag() == param.GetTag()) {
+                            Util.ErrorHappend("Task with same parameter exists!");
+                            continue;
+                        }
 
-                foreach (var task in tasks)
-                    if (task.Key.GetTag() == param.GetTag()) {
-                        Util.ErrorHappend("Task with same parameter exists!");
-                        return null;
-                    }
+                    string newContent;
+                    string tag = param.GetTag(Template.Variables);
+                    NnTask newTask =
+                        new NnTask(
+                            tag,
+                            Template.Type,
+                            FSPath.SubPath("tasks").SubPath(tag),
+                            newContent = Template.GenerateContent(param.Variables)
+                        );
 
-                string newContent;
-                string tag = param.GetTag(Template.Variables, Template.Consts);
-                NnTask newTask =
-                    new NnTask(
-                        tag,
-                        FSPath.SubPath("tasks").SubPath(tag),
-                        newContent = Template.GenerateContent(param.Content)
-                    );
+                    foreach (var oldTask in tasks)
+                        if (oldTask.Value.Equals(newTask)) {
+                            Util.ErrorHappend("Same task exists!");
+                            continue;
+                        }
 
-                foreach (var oldTask in tasks)
-                    if (oldTask.Value.Equals(newTask)) {
-                        Util.ErrorHappend("Same task exists!");
-                        return null;
-                    }
+                    tasks[param] = newTask;
+                    newTasks[param] = newTask;
+                }
 
-                tasks[param] = newTask;
+                
+            } catch {
+                Util.ErrorHappend("Error while adding task!");
+                return new List<NnTask>();
+            }
 
+            try {
                 OnPropertyChanged("Plan - AddTask");
                 OnPropertyChanged("TaskAmount");
                 OnPropertyChanged("BusyTaskAmount");
 
-                Consts = param.Consts.ToImmutableDictionary();
                 Save();
-                return newTask;
+                return newTasks.Values.ToList();
             } catch {
-                Util.ErrorHappend("Error while adding task!");
-                return null;
+
             }
         }
 
@@ -203,6 +211,29 @@ namespace NnManager {
                 Util.ErrorHappend("Error while deleting task!");
                 return false;
             }
+        }
+
+        Dictionary<string, string>? CommonDataCache;
+        public Dictionary<string, string> CommonData {
+            get {
+                if (CommonDataCache == null) {
+                    CommonDataCache = new Dictionary<string, string>();
+                    UpdateKeysOfCommonData(
+                        CommonDataCache,
+                        tasks.Keys.ToList()
+                    );
+                }
+                return CommonDataCache;
+            }
+        }
+
+        static void UpdateKeysOfCommonData(Dictionary<string, string> dict, List<NnParam> pars) {
+            if (pars.Count == 0) return;
+
+            var newDict = new Dictionary<string, string>();
+            foreach (var key in pars[0].Variables.Keys)
+                if (pars.All(x => x.GetValue(key) == pars[0].GetValue(key)))
+                    newList.Add(key);
         }
 
         public void TerminateAll() {
