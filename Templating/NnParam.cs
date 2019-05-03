@@ -32,7 +32,7 @@ namespace NnManager {
             variables.ToImmutableDictionary();
 
         public string? GetValue(string key) =>
-            variables?[key];
+            variables.ContainsKey(key) ? variables[key] : null;
             
         public NnParam(
             Dictionary<string, string> variables) {
@@ -171,9 +171,9 @@ namespace NnManager {
 
             string result = "(";
 
-            foreach (var key in variables.Keys) {
+            foreach (var key in variables.Keys.OrderBy(k => k)) {
                 if (variableDef != null)
-                    if (variables[key] == variableDef?[key]) continue;
+                    if (variables[key] == variableDef[key]) continue;
                 result += $"{key}={variables[key].ToString()}, ";
             }
             if (result == "(")

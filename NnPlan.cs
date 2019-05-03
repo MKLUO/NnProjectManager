@@ -2,10 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
-
-
-
 
 #nullable enable
 
@@ -132,7 +130,11 @@ namespace NnManager {
 
         public NnTask? AddTask(
             NnParam param
-        ) => AddTask(new List<NnParam>{param});
+        ) {
+            var tasks = AddTask(new List<NnParam>{param});
+            if (tasks?.Count() > 0) return tasks[0];
+            else return null;
+        }
 
         public List<NnTask> AddTask(
             List<NnParam> pars
@@ -143,39 +145,30 @@ namespace NnManager {
                     if (!param.Pad(Template))
                         continue;
 
-                    foreach (var task in tasks)
-                        if (task.Key.GetTag() == param.GetTag()) {
-                            Util.ErrorHappend("Task with same parameter exists!");
-                            continue;
-                        }
-
-                    string newContent;
                     string tag = param.GetTag(Template.Variables);
                     NnTask newTask =
                         new NnTask(
                             tag,
                             Template.Type,
                             FSPath.SubPath("tasks").SubPath(tag),
-                            newContent = Template.GenerateContent(param.Variables)
+                            Template.GenerateContent(param.Variables),
+                            Template.GenerateModuleOptions(param.Variables)
                         );
 
-                    foreach (var oldTask in tasks)
-                        if (oldTask.Value.Equals(newTask)) {
-                            Util.ErrorHappend("Same task exists!");
-                            continue;
-                        }
-
-                    tasks[param] = newTask;
-                    newTasks[param] = newTask;
-                }
-
-                
+                    if (tasks.All(x => !x.Value.Equals(newTask)))
+                        newTasks[param] = newTask;
+                }                
             } catch {
-                Util.ErrorHappend("Error while adding task!");
+                Util.ErrorHappend("Error while creating task!");
                 return new List<NnTask>();
             }
 
             try {
+                foreach (var newTask in newTasks)
+                    tasks[newTask.Key] = newTask.Value;
+                
+                UpdateCommonData(newTasks.Keys.ToList());
+
                 OnPropertyChanged("Plan - AddTask");
                 OnPropertyChanged("TaskAmount");
                 OnPropertyChanged("BusyTaskAmount");
@@ -183,13 +176,15 @@ namespace NnManager {
                 Save();
                 return newTasks.Values.ToList();
             } catch {
-
+                Util.ErrorHappend("Error while adding task!");
+                return newTasks.Values.ToList();
             }
         }
 
         public bool DeleteTask(
             NnTask task
         ) {
+            bool success = false;
             try {
                 if (task.IsBusy())
                     if (Util.WarnAndDecide("Selected task is busy rn. Terminate and delete?")) {
@@ -198,42 +193,70 @@ namespace NnManager {
                         return false;
                     }
 
-                foreach(var item in tasks.Where(kvp => kvp.Value == task).ToList())
+                foreach(var item in tasks.Where(kvp => kvp.Value == task).ToList()) {
                     tasks.Remove(item.Key);
-
+                    string path = FSPath.SubPath("tasks").SubPath("_removed").SubPath(task.Name);
+                    while (Directory.Exists(path))
+                        path += "_";
+                    Directory.Move(task.FSPath, path);
+                    DeleteParamInCommonData(item.Key);
+                }                
+                success = true;
+            } catch {
+                Util.ErrorHappend("Error while deleting task!");
+                success = false;
+            } finally {
                 OnPropertyChanged("Plan - DeleteTask");
                 OnPropertyChanged("TaskAmount");
                 OnPropertyChanged("BusyTaskAmount");
 
                 Save();
-                return true;
-            } catch {
-                Util.ErrorHappend("Error while deleting task!");
-                return false;
             }
+            return success;
         }
 
-        Dictionary<string, string>? CommonDataCache;
-        public Dictionary<string, string> CommonData {
+        Dictionary<string, Dictionary<string, int>>? paramDataStat;
+        public List<string> CommonData {
             get {
-                if (CommonDataCache == null) {
-                    CommonDataCache = new Dictionary<string, string>();
-                    UpdateKeysOfCommonData(
-                        CommonDataCache,
-                        tasks.Keys.ToList()
-                    );
+                if (paramDataStat == null) {
+                    paramDataStat = new Dictionary<string, Dictionary<string, int>>();
+                    UpdateCommonData(tasks.Keys.ToList(), true);
                 }
-                return CommonDataCache;
+                
+                var result = new List<string>();
+                foreach (var param in paramDataStat)
+                    if (param.Value.Count() <= 1)
+                        result.Add(param.Key);
+                
+                return result;
             }
         }
 
-        static void UpdateKeysOfCommonData(Dictionary<string, string> dict, List<NnParam> pars) {
+        void UpdateCommonData(List<NnParam> pars, bool reset = false) {
+            if (reset) paramDataStat = new Dictionary<string, Dictionary<string, int>>();
             if (pars.Count == 0) return;
+            if (paramDataStat == null) return;
+            foreach (var par in pars)
+                foreach (var vari in par.Variables) {
+                    if (!paramDataStat.ContainsKey(vari.Key)) 
+                        paramDataStat[vari.Key] = new Dictionary<string, int>();
+                    if (!paramDataStat[vari.Key].ContainsKey(vari.Value))
+                        paramDataStat[vari.Key][vari.Value] = 1;
+                    else 
+                        paramDataStat[vari.Key][vari.Value] += 1;
+                }
+        }
 
-            var newDict = new Dictionary<string, string>();
-            foreach (var key in pars[0].Variables.Keys)
-                if (pars.All(x => x.GetValue(key) == pars[0].GetValue(key)))
-                    newList.Add(key);
+        void DeleteParamInCommonData(NnParam par) {
+            if (paramDataStat == null) return;
+            foreach (var vari in par.Variables) {
+                if (paramDataStat.ContainsKey(vari.Key))
+                if (paramDataStat[vari.Key].ContainsKey(vari.Value)) {
+                    paramDataStat[vari.Key][vari.Value] -= 1;
+                    if (paramDataStat[vari.Key][vari.Value] <= 0)
+                        paramDataStat[vari.Key].Remove(vari.Value);
+                }
+            }
         }
 
         public void TerminateAll() {
@@ -255,8 +278,8 @@ namespace NnManager {
         }
 
         // FIXME: Ignoring multiple module of same type!
-        public string GetReport(ReportType type, Dictionary<string, string> options) {
-            return Report(type, options).Execute();
-        }
+        // public string GetReport(ReportType type, Dictionary<string, string> options) {
+        //     return Report(type, options).Execute();
+        // }
     }
 }

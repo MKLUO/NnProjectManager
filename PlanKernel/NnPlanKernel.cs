@@ -13,7 +13,8 @@ namespace NnManager {
         
     public enum PlanType {
         NoPlan,
-        CBDiamond
+        CBDiamond,
+        FixDensity2DEG
     }
 
     partial class NnPlan {        
@@ -26,6 +27,10 @@ namespace NnManager {
                 
                 case PlanType.CBDiamond:
                     kernel = CBDiamond();
+                    return;
+
+                case PlanType.FixDensity2DEG:
+                    kernel = FixDensity2DEG();
                     return;
             }
         }

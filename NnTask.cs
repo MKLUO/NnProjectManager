@@ -14,6 +14,7 @@ using System.Collections.Immutable;
 
 namespace NnManager {
     using RPath = Util.RestrictedPath;
+    using ModuleOptionDict = Dictionary<ModuleType, Dictionary<string, string>>;
 
     public partial class NnTask : Notifier, INotifyPropertyChanged {
 
@@ -21,6 +22,8 @@ namespace NnManager {
         public NnType Type { get; }
         public RPath FSPath { get; }
         public string Content { get; }
+
+        public ModuleOptionDict BuiltInModuleOptions { get; }
 
         string? status;
         public string? Status {
@@ -41,6 +44,16 @@ namespace NnManager {
         ConcurrentQueue<NnModuleRecord> moduleQueue;
         public IEnumerable<NnModuleRecord> ModuleQueue => moduleQueue;
 
+        public IEnumerable<NnModuleRecord> Modules {
+            get {
+                foreach (var item in moduleQueue)
+                    yield return item;
+                foreach (var item in moduleDone)
+                    yield return item;
+                if (currentModule != null) yield return currentModule;
+            }
+        }
+
         Task? task;
 
         CancellationTokenSource? ts;
@@ -51,14 +64,16 @@ namespace NnManager {
             string name,
             NnType type,
             RPath path,
-            string content
-        ) : this(name, type, path, content, new List<NnModuleRecord>(), new List<NnModuleRecord>()) {}
+            string content,
+            ModuleOptionDict dict
+        ) : this(name, type, path, content, dict, new List<NnModuleRecord>(), new List<NnModuleRecord>()) {}
 
         NnTask(
             string name,
             NnType type,
             RPath path,
             string content,
+            ModuleOptionDict dict,
             List<NnModuleRecord> moduleDone,
             List<NnModuleRecord> moduleQueue
         ) {
@@ -66,6 +81,7 @@ namespace NnManager {
             this.Type = type;
             this.FSPath = path;
             this.Content = content;
+            this.BuiltInModuleOptions = dict;
             this.currentModule = null;
             this.moduleDone = moduleDone;
             this.moduleQueue = new ConcurrentQueue<NnModuleRecord>(moduleQueue);
@@ -79,12 +95,14 @@ namespace NnManager {
                 name = task.Name;
                 type = task.Type;
                 content = task.Content;
+                moduleOptions = task.BuiltInModuleOptions;
                 modulesDone = task.moduleDone;
                 moduleQueue = task.moduleQueue.ToList();
             }
             readonly public string name;
             readonly public NnType type;
             readonly public string content;
+            readonly public ModuleOptionDict moduleOptions;
             readonly public List<NnModuleRecord> modulesDone;
             readonly public List<NnModuleRecord> moduleQueue;
         }
@@ -107,7 +125,8 @@ namespace NnManager {
                     taskData.name, 
                     taskData.type, 
                     path, 
-                    taskData.content, 
+                    taskData.content,
+                    taskData.moduleOptions,
                     taskData.modulesDone, 
                     taskData.moduleQueue);                
 

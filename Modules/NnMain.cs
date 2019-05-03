@@ -15,31 +15,33 @@ namespace NnManager {
     partial class NnTask {
 
         RPath NnMainPath => FSPath;
+        
+        RPath NnMainReportPath => NnMainPath.SubPath("_Report.txt");
 
         public NnModule NnMain(ImmutableDictionary<string, string> options) =>
             new NnModule(
                 "NN Main",
-                NnMainCanExecute, 
+                () => true, 
                 NnMainIsDone, 
                 NnMainExecute, 
-                //FIXME: NnMain result
-                () => "?",
-                NnMainDefaultOption.ToImmutableDictionary(), 
+                NnMainGetResult,
+                NnModule.GetDefaultOptions(ModuleType.NnMain),
                 options);
+ 
 
-        // FIXME:
-        public static ImmutableDictionary<string, string> NnMainDefaultOption = 
-            new Dictionary<string, string>().ToImmutableDictionary();
-
-        bool NnMainCanExecute() {
-            // FIXME: 
+        bool NnMainIsDone() {
+            // FIXME: Check report?
             return true;
         }
 
-        bool NnMainIsDone() {
-            // FIXME: Do hashing after execution.
-            // return Directory.Exists(path.SubPath("main", false));
-            return true;
+        string NnMainGetResult() {
+            try {
+                // FIXME: done (converge) / diverge.
+                File.ReadAllText(NnMainReportPath);
+                return "(done)";
+            } catch {
+                return "(error)";
+            }
         }
 
         bool NnMainExecute(CancellationToken ct, ImmutableDictionary<string, string> options) {
@@ -56,6 +58,13 @@ namespace NnManager {
             );
 
             tsLog.Cancel();
+
+            string? report = NnAgent.GenerateNnReport(
+                NnMainPath, ct, Type
+            );
+
+            if (report != null)
+                File.WriteAllText(NnMainReportPath, report);
 
             return !ct.IsCancellationRequested;
         }

@@ -64,7 +64,7 @@ namespace NnManager {
                 new NnParamForm(
                     Plan.Template.Variables,
                     null,
-                    Plan.CommonData.Keys.ToList()
+                    Plan.CommonData
                 );
 
             public NnParamForm GetTaskParamForm(NnTaskData? task = null) {
@@ -77,13 +77,13 @@ namespace NnManager {
                                 x => x.Value ?? ""
                             )
                         ),
-                        Plan.CommonData.Keys.ToList()
+                        Plan.CommonData
                     );
                 } else {
                     return new NnParamForm(
                         Plan.Template.Variables,
                         task.Param,
-                        Plan.CommonData.Keys.ToList()                    
+                        Plan.CommonData           
                     );
                 }
             }
@@ -120,12 +120,13 @@ namespace NnManager {
 
             public void QueueModule(NnModuleForm mData) {
                 foreach (var task in Plan.Tasks.Values) {
-                    task.QueueModule(
-                        new NnModuleRecord(
-                            mData.Type,
-                            new Dictionary<string, string>(mData.OptionsResult)
-                        )
-                    );
+                    if (task.Modules.Where(x => x.Type == mData.Type).Count() == 0)
+                        task.QueueModule(
+                            new NnModuleRecord(
+                                mData.Type,
+                                new Dictionary<string, string>(mData.OptionsResult)
+                            )
+                        );
                 }
             }
 
@@ -190,6 +191,15 @@ namespace NnManager {
 
             public bool IsRef(NnTask data) =>
                 this.Task == data;
+
+            public NnModuleForm GetModuleForm(ModuleType type) {
+                return new NnModuleForm(
+                    new NnModuleRecord(
+                        type,
+                        Task.BuiltInModuleOptions[type]
+                    )
+                );
+            }
 
             public void QueueModule(NnModuleForm mData) =>
                 Task.QueueModule(
@@ -298,7 +308,6 @@ namespace NnManager {
                     x => (x.Value ?? x.Default) == null
                 ).Count() == 0);
 
-            public bool FixConst { get; }
             public ImmutableList<Variable> Variables { get; }
             public ImmutableList<Variable> CommonVariables { get; }
 
@@ -307,7 +316,6 @@ namespace NnManager {
                 NnParam? param = null,
                 List<string>? keysOfCommonData = null
             ) {
-                this.FixConst = param != null;
 
                 var variables = new List<Variable>();
                 var commonVariables = new List<Variable>();
@@ -334,7 +342,7 @@ namespace NnManager {
             public NnParam? ToNnParam() {
                 try {
                     return new NnParam(
-                        Variables.ToDictionary(
+                        Variables.Concat(CommonVariables).ToDictionary(
                             x => x.Name,
                             x => x.Value ?? x.Default ??
                             throw new Exception()
@@ -383,18 +391,26 @@ namespace NnManager {
                 this.Options = options.ToImmutableList();
             }
 
+            // FIXME: TOO MUCH logic in projectdata
             public NnModuleForm(                
                 NnModuleRecord record
             ) {
                 this.Type = record.Type;
 
                 var options = new List<Variable>();
-                foreach (var item in NnModule.GetDefaultOptions(record.Type))
+                var defaultOptions = NnModule.GetDefaultOptions(record.Type);
+                foreach (var item in defaultOptions)
                     options.Add(
                         new Variable(
                             item.Key,
                             item.Value,
-                            record.Options?[item.Key]));
+                            record.Options != null ?
+                                (record.Options.ContainsKey(item.Key) ? 
+                                    record.Options[item.Key] :
+                                    null) :
+                                null
+                            )
+                        );
 
                 this.Options = options.ToImmutableList();
                 this.Result = record.Result;
