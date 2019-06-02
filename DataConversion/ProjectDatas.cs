@@ -118,9 +118,9 @@ namespace NnManager {
                 return false;
             }
 
-            public void QueueModule(NnModuleForm mData) {
+            public void QueueModule(NnModuleForm mData, bool force = false) {
                 foreach (var task in Plan.Tasks.Values) {
-                    if (task.Modules.Where(x => x.Type == mData.Type).Count() == 0)
+                    if (force || (task.Modules.Where(x => x.Type == mData.Type).Count() == 0))
                         task.QueueModule(
                             new NnModuleRecord(
                                 mData.Type,

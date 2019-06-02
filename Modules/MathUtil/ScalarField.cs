@@ -19,8 +19,8 @@ namespace NnManager {
         public enum Dim {X, Y, Z}
 
         // FIXME: Public data should be immutable
-        Complex[,,] Data { get; }
-        ImmutableDictionary<Dim, ImmutableList<double>> Coords { get; }
+        public Complex[,,] Data { get; }
+        public ImmutableDictionary<Dim, ImmutableList<double>> Coords { get; }
 
         public ScalarField(Complex[,,] array, ImmutableDictionary<Dim, ImmutableList<double>> coords) {
             Data = array;
@@ -28,6 +28,15 @@ namespace NnManager {
                 { Dim.X, coords[Dim.X] },
                 { Dim.Y, coords[Dim.Y] },
                 { Dim.Z, coords[Dim.Z] }
+            }.ToImmutableDictionary();
+        }
+
+        public ScalarField(Complex[,,] array) {
+            Data = array;
+            Coords = new Dictionary<Dim, ImmutableList<double>>{
+                { Dim.X, Enumerable.Range(0, array.GetLength(0)).Select(x => Convert.ToDouble(x)).ToImmutableList() },
+                { Dim.Y, Enumerable.Range(0, array.GetLength(1)).Select(x => Convert.ToDouble(x)).ToImmutableList() },
+                { Dim.Z, Enumerable.Range(0, array.GetLength(2)).Select(x => Convert.ToDouble(x)).ToImmutableList() }
             }.ToImmutableDictionary();
         }
 
@@ -167,16 +176,16 @@ namespace NnManager {
             );
         }
 
+        static double D(int x, ImmutableList<double> data) {
+            if ((x < 0) || (x >= data.Count)) 
+                return 0.0;
+            if (x == 0) 
+                return data[1] - data[0];
+            if (x == data.Count - 1) 
+                return data[data.Count - 1] - data[data.Count - 2];                    
+            return (data[x + 1] - data[x - 1]) * 0.5;
+        }
         double DxDyDz(int x, int y, int z) {
-            double D(int x, ImmutableList<double> data) {
-                if ((x < 0) || (x >= data.Count)) 
-                    return 0.0;
-                if (x == 0) 
-                    return data[1] - data[0];
-                if (x == data.Count - 1) 
-                    return data[data.Count - 1] - data[data.Count - 2];                    
-                return (data[x + 1] - data[x - 1]) * 0.5;
-            }
             return D(x, Coords[Dim.X]) * D(y, Coords[Dim.Y]) * D(z, Coords[Dim.Z]);
         }
 
@@ -200,25 +209,48 @@ namespace NnManager {
             return result;
         }
 
+        public static ScalarField operator+(ScalarField left, ScalarField right) {
+            return new ScalarField(Addition(left.Data, right.Data), left.Coords);
+        }
+
         public static ScalarField operator*(ScalarField left, ScalarField right) {
-            var Coords = left.Coords;
+            return new ScalarField(DirectProduct(left.Data, right.Data), left.Coords);
+        }
 
-            Complex[,,] array = new Complex[
-                Coords[Dim.X].Count,
-                Coords[Dim.Y].Count,
-                Coords[Dim.Z].Count
-            ];
+        public static ScalarField operator*(double value, ScalarField field) {
+            return field * value;
+        }
 
-            foreach (var x in Enumerable.Range(0, Coords[Dim.X].Count))
-            foreach (var y in Enumerable.Range(0, Coords[Dim.Y].Count))
-            foreach (var z in Enumerable.Range(0, Coords[Dim.Z].Count))
-                array[x, y, z] = new Complex(
-                    left.Data[x, y, z].Real * right.Data[x, y, z].Real - 
-                    left.Data[x, y, z].Imaginary * right.Data[x, y, z].Imaginary, 
-                    left.Data[x, y, z].Real * right.Data[x, y, z].Imaginary + 
-                    left.Data[x, y, z].Imaginary * right.Data[x, y, z].Real);
+        public static ScalarField operator*(ScalarField field, double value) {
+            return new ScalarField(Multiply(field.Data, value), field.Coords);
+        }
 
-            return new ScalarField(array, Coords);
+        public static Complex[,,] Addition(Complex[,,] left, Complex[,,] right) {
+            var dimX = Math.Min(left.GetLength(0), right.GetLength(0));
+            var dimY = Math.Min(left.GetLength(1), right.GetLength(1));
+            var dimZ = Math.Min(left.GetLength(2), right.GetLength(2));
+
+            var result = new Complex[dimX, dimY, dimZ];
+            foreach (var x in Enumerable.Range(0, dimX))
+            foreach (var y in Enumerable.Range(0, dimY))
+            foreach (var z in Enumerable.Range(0, dimZ))
+                result[x, y, z] = left[x, y, z] + right[x, y, z];
+
+            return result;
+        }
+
+        public static Complex[,,] Multiply(Complex[,,] field, double value) {
+            var dimX = field.GetLength(0);
+            var dimY = field.GetLength(1);
+            var dimZ = field.GetLength(2);
+
+            var result = new Complex[dimX, dimY, dimZ];
+            foreach (var x in Enumerable.Range(0, dimX))
+            foreach (var y in Enumerable.Range(0, dimY))
+            foreach (var z in Enumerable.Range(0, dimZ))
+                result[x, y, z] = field[x, y, z] * value;
+
+            return result;
         }
 
         public ScalarField Conj() {
@@ -308,7 +340,86 @@ namespace NnManager {
                 IntegrateInRange((null, null, null), (null, null, null)).Real;
         }
 
-        public static Complex Coulomb(ScalarField f1, ScalarField f2) {
+        // public static Complex[,,] CoulombSplitFT(ScalarField refer) {
+        //     int dimX = refer.Coords[Dim.X].Count;
+        //     int dimY = refer.Coords[Dim.Y].Count;
+        //     int dimZ = refer.Coords[Dim.Z].Count;
+
+        //     var xC = refer.Coords[Dim.X].Count / 2;
+        //     var yC = refer.Coords[Dim.Y].Count / 2;
+        //     var zC = refer.Coords[Dim.Z].Count / 2;
+        //     double gX = refer.Coords[Dim.X][xC] - refer.Coords[Dim.X][xC-1];
+        //     double gY = refer.Coords[Dim.Y][yC] - refer.Coords[Dim.Y][yC-1];
+        //     double gZ = refer.Coords[Dim.Z][zC] - refer.Coords[Dim.Z][zC-1];
+
+        //     Complex[,,] coulombSplit = new Complex[
+        //         dimX * 2 + 1,
+        //         dimY * 2 + 1,
+        //         dimZ * 2 + 1
+        //     ];
+
+        //     foreach (var x in Enumerable.Range(0, dimX * 2 + 1))
+        //     foreach (var y in Enumerable.Range(0, dimY * 2 + 1))
+        //     foreach (var z in Enumerable.Range(0, dimZ * 2 + 1))
+        //         coulombSplit[x, y, z] = 
+        //             1.0 / Math.Sqrt(
+        //                 Math.Pow((x - dimX - 0.5)*gX, 2) + 
+        //                 Math.Pow((y - dimY - 0.5)*gY, 2) + 
+        //                 Math.Pow((z - dimZ - 0.5)*gZ, 2));
+
+        //     return FFT(coulombSplit);
+        // }
+
+        public static ScalarField CoulombPotential(ScalarField density) {
+            var Constant = 4.0 * Math.PI * CoulombConstant();
+
+            // Calculate laplacian
+
+            var densityFT = FFT(density.Data);
+            var potentialFT = new ScalarField(density.Data, density.Coords).Data;
+
+            int dimX = density.Coords[Dim.X].Count;
+            int dimY = density.Coords[Dim.Y].Count;
+            int dimZ = density.Coords[Dim.Z].Count;
+            var gridX = D(dimX / 2, density.Coords[Dim.X]);
+            var gridY = D(dimY / 2, density.Coords[Dim.Y]);
+            var gridZ = D(dimZ / 2, density.Coords[Dim.Z]);
+            foreach (var x in Enumerable.Range(0, dimX))
+            foreach (var y in Enumerable.Range(0, dimY))
+            foreach (var z in Enumerable.Range(0, dimZ)) {
+                double kx, ky, kz;
+                if (x >= 0.5 * dimX)
+                    kx = (x - dimX) * 2.0 * Math.PI  / (dimX * gridX);
+                else
+                    kx = x * 2.0 * Math.PI  / (dimX * gridX);
+                if (y >= 0.5 * dimY)
+                    ky = (y - dimY) * 2.0 * Math.PI  / (dimY * gridY);
+                else
+                    ky = y * 2.0 * Math.PI  / (dimY * gridY);
+                if (z >= 0.5 * dimZ)
+                    kz = (z - dimZ) * 2.0 * Math.PI  / (dimZ * gridZ);
+                else
+                    kz = z * 2.0 * Math.PI  / (dimZ * gridZ);
+
+                var kk = (kx * kx + ky * ky + kz * kz);
+                if (kk != 0.0)
+                    potentialFT[x, y, z] = densityFT[x, y, z] / kk * Constant;
+                else 
+                    // NOTE: Set the constant part of potential_FT to zero.
+                    potentialFT[x, y, z] = 0.0;
+            }
+
+            return new ScalarField(IFFT(potentialFT), density.Coords);
+        }
+        
+        // FIXME: VERY DIRTY Coulomb calculation here!
+
+        public static Complex Coulomb(
+                ScalarField f1, 
+                ScalarField f2, 
+                Complex[,,]? coulomb = null, 
+                Dictionary<Complex[,,], Complex[,,]>? ftDict = null) {
+
             int dimX = Math.Max(f1.Coords[Dim.X].Count, f2.Coords[Dim.X].Count);
             int dimY = Math.Max(f1.Coords[Dim.Y].Count, f2.Coords[Dim.Y].Count);
             int dimZ = Math.Max(f1.Coords[Dim.Z].Count, f2.Coords[Dim.Z].Count);
@@ -320,6 +431,7 @@ namespace NnManager {
             double gY = f1.Coords[Dim.Y][yC] - f1.Coords[Dim.Y][yC-1];
             double gZ = f1.Coords[Dim.Z][zC] - f1.Coords[Dim.Z][zC-1];
             
+            #region oldCoulomb
             // // Prepare Coulomb field
             // Complex[,,] coulomb = new Complex[
             //     dimX * 2,
@@ -356,26 +468,30 @@ namespace NnManager {
             //     (dimX, dimY, dimZ), 
             //     (dimX, dimY, dimZ)
             // );
+            #endregion
+
 
             /***
                 To evaluate coulomb integral between 2 scalar field, here I resampled f2 
                 onto half-grids to avoid singular point (delta r = 0) in coulomb kernel.
              */
 
-            Complex[,,] coulombSplit = new Complex[
+            var coulombSplit = new Complex[
                 dimX * 2 + 1,
                 dimY * 2 + 1,
                 dimZ * 2 + 1
             ];
 
-            foreach (var x in Enumerable.Range(0, dimX * 2 + 1))
-            foreach (var y in Enumerable.Range(0, dimY * 2 + 1))
-            foreach (var z in Enumerable.Range(0, dimZ * 2 + 1))
-                coulombSplit[x, y, z] = 
-                    1.0 / Math.Sqrt(
-                        Math.Pow((x - dimX - 0.5)*gX, 2) + 
-                        Math.Pow((y - dimY - 0.5)*gY, 2) + 
-                        Math.Pow((z - dimZ - 0.5)*gZ, 2));
+            if (coulomb == null) {
+                foreach (var x in Enumerable.Range(0, dimX * 2 + 1))
+                foreach (var y in Enumerable.Range(0, dimY * 2 + 1))
+                foreach (var z in Enumerable.Range(0, dimZ * 2 + 1))
+                    coulombSplit[x, y, z] = 
+                        1.0 / Math.Sqrt(
+                            Math.Pow((x - dimX - 0.5)*gX, 2) + 
+                            Math.Pow((y - dimY - 0.5)*gY, 2) + 
+                            Math.Pow((z - dimZ - 0.5)*gZ, 2));
+            } else coulombSplit = coulomb;
 
             Complex[,,] f2Split = new Complex[
                 dimX + 1,
@@ -393,22 +509,51 @@ namespace NnManager {
 
             var conv = ConvolutionSym(
                 coulombSplit, 
-                f2Split, 
-                (dimX, dimY, dimZ), 
-                (dimX, dimY, dimZ)
+                f2Split,
+                ftDict
             );
+
+            // Complex result = 0.0;
+            // foreach (var x in Enumerable.Range(0, dimX))
+            // foreach (var y in Enumerable.Range(0, dimY))
+            // foreach (var z in Enumerable.Range(0, dimZ))
+            //     result += conv[x, y, z] * f1.Data[x, y, z];
+
+            return InnerProduct(f1.Data, conv) * gX * gY * gZ * gX * gY * gZ * CoulombConstant();
+        }
+        
+
+        public static Complex InnerProduct(Complex[,,] left, Complex[,,] right) {
+            var dimX = Math.Min(left.GetLength(0), right.GetLength(0));
+            var dimY = Math.Min(left.GetLength(1), right.GetLength(1));
+            var dimZ = Math.Min(left.GetLength(2), right.GetLength(2));
 
             Complex result = 0.0;
             foreach (var x in Enumerable.Range(0, dimX))
             foreach (var y in Enumerable.Range(0, dimY))
             foreach (var z in Enumerable.Range(0, dimZ))
-                result += conv[x, y, z] * f1.Data[x, y, z];
+                result += left[x, y, z] * right[x, y, z];
 
-            return result * gX * gY * gZ * gX * gY * gZ * CoulombConstant();
+            return result;
         }
 
+        public static Complex[,,] DirectProduct(Complex[,,] left, Complex[,,] right) {
+            var dimX = Math.Min(left.GetLength(0), right.GetLength(0));
+            var dimY = Math.Min(left.GetLength(1), right.GetLength(1));
+            var dimZ = Math.Min(left.GetLength(2), right.GetLength(2));
+
+            var result = new Complex[dimX, dimY, dimZ];
+            foreach (var x in Enumerable.Range(0, dimX))
+            foreach (var y in Enumerable.Range(0, dimY))
+            foreach (var z in Enumerable.Range(0, dimZ))
+                result[x, y, z] = left[x, y, z] * right[x, y, z];
+
+            return result;
+        }
+
+        // FIXME: Including dieletric constant here!
         // Unit: eV * nm (Coulomb constant * e)
-        static double CoulombConstant() =>
+        public static double CoulombConstant() =>
             // 1.43996454;
             1.43996454 / 11.7;
             // 0.0;
@@ -503,8 +648,7 @@ namespace NnManager {
         public static Complex[,,] ConvolutionSym(
             Complex[,,] target, 
             Complex[,,] mask,
-            (int x, int y, int z) trunStart,
-            (int x, int y, int z) trunLength
+            Dictionary<Complex[,,], Complex[,,]>? ftDict = null
         ) {        
             
             int dimX = target.GetLength(0);
@@ -515,37 +659,31 @@ namespace NnManager {
             // var maskPadRev = Reverse(maskPad);
 
             //// FFT
-            var maskFT = FFT(maskPad);
-            var targetFT = FFT(target);
+            Complex[,,] maskFT, targetFT;
 
-            //// Compose convolution result in k-space
-            var convFT = new Complex[
-                dimX,
-                dimY,
-                dimZ
-            ];
+            if (ftDict != null) {
+                if (!ftDict.ContainsKey(target))
+                    ftDict[target] = FFT(target); 
+                if (!ftDict.ContainsKey(mask))
+                    ftDict[mask]   = FFT(maskPad);
+                
+                targetFT = ftDict[target];
+                maskFT   = ftDict[mask];
+            } else {
+                targetFT = FFT(target);
+                maskFT   = FFT(maskPad);
+            }            
 
-            foreach (var kx in Enumerable.Range(0, dimX))
-            foreach (var ky in Enumerable.Range(0, dimY))
-            foreach (var kz in Enumerable.Range(0, dimZ))
-                convFT[kx, ky, kz] = 
-                    maskFT[kx, ky, kz] * 
-                    targetFT[kx, ky, kz];
+            var convFT = DirectProduct(maskFT, targetFT);
 
             //// IFFT
-            var conv = IFFT(convFT);
+            var convINV = IFFT(convFT);
+            var conv = Reverse(convINV);
+
 
             return Truncate(conv, 
-                (
-                    trunLength.x,
-                    trunLength.y,
-                    trunLength.z
-                ),
-                (                    
-                    trunStart.x,  
-                    trunStart.y, 
-                    trunStart.z
-                )
+                (dimX/2, dimY/2, dimZ/2),
+                (dimX/2 - 1, dimY/2 - 1, dimZ/2 - 1)
             );
 
             // return conv;
@@ -557,23 +695,31 @@ namespace NnManager {
             var dimY = input.GetLength(1);
             var dimZ = input.GetLength(2);
 
-            var flat = Flatten(input);
-            var flatOut = new Complex[dimX * dimY * dimZ];
+            // var flat = Flatten(input);
+            // var flatOut = new Complex[dimX * dimY * dimZ];
 
-            PinnedArray<Complex> pinnedFlat  = new PinnedArray<Complex>(flat);
-            PinnedArray<Complex> pinnedFlatOut = new PinnedArray<Complex>(flatOut);
+            // PinnedArray<Complex> pinnedFlat  = new PinnedArray<Complex>(flat);
+            // PinnedArray<Complex> pinnedFlatOut = new PinnedArray<Complex>(flatOut);
 
-            DFT.FFT(pinnedFlat, pinnedFlatOut);
+            // DFT.FFT(pinnedFlat, pinnedFlatOut);
 
-            var result = Unflatten(
-                flatOut,  
-                (dimX, dimY, dimZ)
-            );
+            // var result = Unflatten(
+            //     flatOut,  
+            //     (dimX, dimY, dimZ)
+            // );
 
-            pinnedFlat.Dispose();
-            pinnedFlatOut.Dispose();
+            // pinnedFlat.Dispose();
+            // pinnedFlatOut.Dispose();
 
-            return result;
+            
+            var output = new Complex[dimX, dimY, dimZ];
+            PinnedArray<Complex> pinnedInput  = new PinnedArray<Complex>(input);
+            PinnedArray<Complex> pinnedOutput = new PinnedArray<Complex>(output);
+
+            DFT.FFT(pinnedInput, pinnedOutput);
+
+            // return Multiply(output, 1.0 / Math.Sqrt(dimX * dimY * dimZ));
+            return output;
         }
 
         // public static Complex[,,] FFTaf(Complex[,,] input) {
@@ -612,23 +758,30 @@ namespace NnManager {
             var dimY = input.GetLength(1);
             var dimZ = input.GetLength(2);
 
-            var flat = Flatten(input);
-            var flatOut = new Complex[dimX * dimY * dimZ];
+            // var flat = Flatten(input);
+            // var flatOut = new Complex[dimX * dimY * dimZ];
 
-            PinnedArray<Complex> pinnedFlat  = new PinnedArray<Complex>(flat);
-            PinnedArray<Complex> pinnedFlatOut = new PinnedArray<Complex>(flatOut);
+            // PinnedArray<Complex> pinnedFlat  = new PinnedArray<Complex>(flat);
+            // PinnedArray<Complex> pinnedFlatOut = new PinnedArray<Complex>(flatOut);
 
-            DFT.IFFT(pinnedFlat, pinnedFlatOut);
+            // DFT.IFFT(pinnedFlat, pinnedFlatOut);
 
-            var result = Unflatten(
-                flatOut.Select(r => r / (dimX * dimY * dimZ)).ToArray(),
-                (dimX, dimY, dimZ)
-            );
+            // var result = Unflatten(
+            //     flatOut.Select(r => r / (dimX * dimY * dimZ)).ToArray(),
+            //     (dimX, dimY, dimZ)
+            // );
             
-            pinnedFlat.Dispose();
-            pinnedFlatOut.Dispose();
+            // pinnedFlat.Dispose();
+            // pinnedFlatOut.Dispose();
+
+            var output = new Complex[dimX, dimY, dimZ];
+            PinnedArray<Complex> pinnedInput  = new PinnedArray<Complex>(input);
+            PinnedArray<Complex> pinnedOutput = new PinnedArray<Complex>(output);
+
+            DFT.FFT(pinnedInput, pinnedOutput);
             
-            return result;
+            // return Multiply(output, 1.0 / Math.Sqrt(dimX * dimY * dimZ));
+            return Multiply(output, 1.0 / (dimX * dimY * dimZ));
         }
     } 
 }

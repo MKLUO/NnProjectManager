@@ -30,7 +30,7 @@ namespace NnManager {
  
 
         bool NnMainIsDone() {
-            // FIXME: Check report?
+            // FIXME: Check report?            
             return true;
         }
 

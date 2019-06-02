@@ -25,7 +25,6 @@ namespace NnManager {
                 NnDen2DEGDefaultOption.ToImmutableDictionary(),
                 options);
 
-        // FIXME:
         public static ImmutableDictionary<string, string> NnDen2DEGDefaultOption = 
             new Dictionary<string, string>{
                 {"x0", "-"},
