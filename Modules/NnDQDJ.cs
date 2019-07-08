@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Text.RegularExpressions;
 using System.Threading;
 
 
@@ -16,8 +17,9 @@ namespace NnManager {
     partial class NnTask {   
 
         RPath NnDQDJPath       => FSPath.SubPath("NnDQDJ");
-        RPath NnDQDJResultPath   => NnDQDJPath.SubPath("_Result.txt");
-        RPath NnDQDJReportPath   => NnDQDJPath.SubPath("_Report.txt");
+        RPath NnDQDJResultPath => NnDQDJPath.SubPath($"_Result.txt");
+        RPath NnDQDJReportPath => NnDQDJPath.SubPath($"_Report.txt");
+        RPath NnDQDJCorrectedEnergyPath => NnDQDJPath.SubPath("_CorrectedEnergy.dat");
 
         NnModule NnDQDJ(ImmutableDictionary<string, string> options) =>
             new NnModule(
@@ -55,7 +57,8 @@ namespace NnManager {
             double? y1 = y1s != "-" ? Convert.ToDouble(y1s) : (double?)null;
             double? z0 = z0s != "-" ? Convert.ToDouble(z0s) : (double?)null;
             double? z1 = z1s != "-" ? Convert.ToDouble(z1s) : (double?)null;
-
+            options.TryGetValue("order", out string? orders);
+            int order = orders != "-" ? Convert.ToUInt16(orders) : 2;
 
             
             //// Read in spectrum & info (from DQD Report) ////
@@ -73,9 +76,9 @@ namespace NnManager {
             var specRD = new List<(int Id, double Energy)>();
 
             
-            var occupations = NnAgent.ReadNXY(NnDQDReportIdPath.Content, 0) ??
+            var occupations = NnAgent.ReadNXY(NnDQDReportAllPath.Content, 0) ??
                 throw new Exception();
-            var occups = new double[occupations.Count];
+            var occups = new double[occupations.Count + 1];
             foreach (var (id, occup) in occupations) {
                 occups[int.Parse(id)] = Double.Parse(occup);
             }
@@ -103,8 +106,6 @@ namespace NnManager {
             }       
 
             //// Read in WF files ( # = order'
-            options.TryGetValue("order", out string? orders);
-            int order = orders != "-" ? Convert.ToUInt16(orders) : 2;
 
             if (order < 1) 
                 return false;
@@ -151,6 +152,32 @@ namespace NnManager {
                 }
             }
 
+            ////// Calculate Coulomb Kernel
+            var refer = lDWF[0].wf;
+            int dimX = refer.Coords[Dim.X].Count;
+            int dimY = refer.Coords[Dim.Y].Count;
+            int dimZ = refer.Coords[Dim.Z].Count;
+            var xC = refer.Coords[Dim.X].Count / 2;
+            var yC = refer.Coords[Dim.Y].Count / 2;
+            var zC = refer.Coords[Dim.Z].Count / 2;
+            double gX = refer.Coords[Dim.X][xC] - refer.Coords[Dim.X][xC-1];
+            double gY = refer.Coords[Dim.Y][yC] - refer.Coords[Dim.Y][yC-1];
+            double gZ = refer.Coords[Dim.Z][zC] - refer.Coords[Dim.Z][zC-1];
+            var coulomb = new Complex[
+                dimX * 2 + 1,
+                dimY * 2 + 1,
+                dimZ * 2 + 1
+            ];
+            foreach (var x in Enumerable.Range(0, dimX * 2 + 1))
+            foreach (var y in Enumerable.Range(0, dimY * 2 + 1))
+            foreach (var z in Enumerable.Range(0, dimZ * 2 + 1))
+                coulomb[x, y, z] = 
+                    1.0 / Math.Sqrt(
+                        Math.Pow((x - dimX - 0.5)*gX, 2) + 
+                        Math.Pow((y - dimY - 0.5)*gY, 2) + 
+                        Math.Pow((z - dimZ - 0.5)*gZ, 2));
+
+                        
 
             //// Substrate out extra Hartree energy included in NN mean-field calculation
 
@@ -163,9 +190,20 @@ namespace NnManager {
                 else {
                     boundChargeDensity += (wf * wf.Conj()) * occup;
                 }
-            }            
-
-            var boundChargePotential = ScalarField.CoulombPotential(boundChargeDensity);
+            }
+            foreach (var wfCollection in new [] {
+                lDWF, lUWF, rDWF, rUWF})
+            for (int i = 0; i < order; i++)
+            {
+                wfCollection[i] = (
+                    wfCollection[i].energy - 
+                        ScalarField.Coulomb(
+                            boundChargeDensity, 
+                            wfCollection[i].wf * wfCollection[i].wf.Conj(),
+                            coulomb).Real, 
+                    wfCollection[i].wf
+                );
+            }
 
             //// Assemble WFs into pseudo densities (direct product) (den[i, j] = n(r) = <j| * |i>)
             /*
@@ -225,32 +263,14 @@ namespace NnManager {
             var cHamUU = new Complex[ pb.Count(),  pb.Count()];
             var cHamDD = new Complex[ pb.Count(),  pb.Count()];
 
-            ////// Calculate Coulomb Kernel
-            var refer = denUp[0, 0];
-            int dimX = refer.Coords[Dim.X].Count;
-            int dimY = refer.Coords[Dim.Y].Count;
-            int dimZ = refer.Coords[Dim.Z].Count;
-            var xC = refer.Coords[Dim.X].Count / 2;
-            var yC = refer.Coords[Dim.Y].Count / 2;
-            var zC = refer.Coords[Dim.Z].Count / 2;
-            double gX = refer.Coords[Dim.X][xC] - refer.Coords[Dim.X][xC-1];
-            double gY = refer.Coords[Dim.Y][yC] - refer.Coords[Dim.Y][yC-1];
-            double gZ = refer.Coords[Dim.Z][zC] - refer.Coords[Dim.Z][zC-1];
-            var coulomb = new Complex[
-                dimX * 2 + 1,
-                dimY * 2 + 1,
-                dimZ * 2 + 1
-            ];
-            foreach (var x in Enumerable.Range(0, dimX * 2 + 1))
-            foreach (var y in Enumerable.Range(0, dimY * 2 + 1))
-            foreach (var z in Enumerable.Range(0, dimZ * 2 + 1))
-                coulomb[x, y, z] = 
-                    1.0 / Math.Sqrt(
-                        Math.Pow((x - dimX - 0.5)*gX, 2) + 
-                        Math.Pow((y - dimY - 0.5)*gY, 2) + 
-                        Math.Pow((z - dimZ - 0.5)*gZ, 2));
 
-            
+            string reportEnergy = "";
+            reportEnergy += "no. energy-left-up(eV) energy-left-down(eV) energy-right-up(eV) energy-right-down(eV)\n";
+            for (int i = 0; i < order ; i++) {
+                reportEnergy += $"{i} {lUWF[i].energy} {lDWF[i].energy} {rUWF[i].energy} {rDWF[i].energy}\n";
+            }
+            File.WriteAllText(NnDQDJCorrectedEnergyPath, reportEnergy);
+
 
             // FIXME: VERY DIRTY Coulomb calculation here!
 
@@ -278,17 +298,23 @@ namespace NnManager {
                     var den3 = denSet1[basis[i].i, basis[j].j];
                     var den4 = denSet2[basis[i].j, basis[j].i];                    
 
-                    cHam[i, j] = 0.5 * (
-                        ScalarField.Coulomb(den1, den2, coulomb, ftDict) + 
-                        ScalarField.Coulomb(den2, den1, coulomb, ftDict)
-                    );   
+                    // cHam[i, j] = 0.5 * (
+                    //     ScalarField.Coulomb(den1, den2, coulomb, ftDict) + 
+                    //     ScalarField.Coulomb(den2, den1, coulomb, ftDict)
+                    // );   
+
+                    cHam[i, j] = ScalarField.Coulomb(den1, den2, coulomb, ftDict); 
 
                     //// In parallel spin states, conjugate term of orbital WF also contributes to ham.
+
+                    // if (selCoef != 0.0)
+                    //     cHam[i, j] += selCoef * 0.5 * (
+                    //     ScalarField.Coulomb(den3, den4, coulomb, ftDict) + 
+                    //     ScalarField.Coulomb(den4, den3, coulomb, ftDict)
+                    // );      
+
                     if (selCoef != 0.0)
-                        cHam[i, j] += selCoef * 0.5 * (
-                        ScalarField.Coulomb(den3, den4, coulomb, ftDict) + 
-                        ScalarField.Coulomb(den4, den3, coulomb, ftDict)
-                    );        
+                        cHam[i, j] += selCoef * ScalarField.Coulomb(den3, den4, coulomb, ftDict);        
 
                     var eigenEnergy = 0.0;
                     if ((basis[i].i == basis[j].i) && (basis[i].j == basis[j].j))
@@ -332,6 +358,11 @@ namespace NnManager {
             verbalReport += $"J = {J.ToString("E04")} (eV), order = {order}\n";
 
             ////// Pickup eigenstates (candidates), label them by their leading components.
+            /// 
+            string BasisIdxToTag(int idx) {
+                if (idx >= order) return $"R{idx - order}";
+                else return $"L{idx}";
+            }
             
             string 
                 udInfo = $"[1, 0]: none", 
@@ -359,18 +390,20 @@ namespace NnManager {
                 foreach (var comp in compList) {
                     var occup = comp.occup.Magnitude * comp.occup.Magnitude;
                     if (occup > 0.01) {
-                        // compInfo += $"({basis[comp.index].i}, {basis[comp.index].j}):{occup.ToString("0.000")} ";
-                        if ((leadPair.i, leadPair.j) == (0, order))
-                            compInfo += $"(L{basis[comp.index].i},R{basis[comp.index].j - order}):{occup.ToString("0.000")} ";
-                        if ((leadPair.i, leadPair.j) == (order, 0))
-                            compInfo += $"(L{basis[comp.index].j},R{basis[comp.index].i - order}):{occup.ToString("0.000")} ";
+                        compInfo += $"({BasisIdxToTag(basis[comp.index].i)},{BasisIdxToTag(basis[comp.index].j)}):{occup.ToString("0.000")} ";                        
                     }
                 }
 
+                
+
                 if (basis == apb) {
-                    if ((leadPair.i, leadPair.j) == (0, order))
+                    // if ((leadPair.i, leadPair.j) == (0, order))
+                    //     udInfo = $"[1, 0]: " + energyInfo + "\n" + compInfo;
+                    // if ((leadPair.i, leadPair.j) == (order, 0))
+                    //     duInfo = $"[0, 1]: " + energyInfo + "\n" + compInfo;
+                    if (eig == apEigen[0])
                         udInfo = $"[1, 0]: " + energyInfo + "\n" + compInfo;
-                    if ((leadPair.i, leadPair.j) == (order, 0))
+                    if (eig == apEigen[1])
                         duInfo = $"[0, 1]: " + energyInfo + "\n" + compInfo;
                 }
                 
@@ -382,16 +415,45 @@ namespace NnManager {
                 }
             }
 
+            /// Pick up lowest 3 energy in AP
+            /// 
+
+            double pGS = (uuEigen[0].val + ddEigen[0].val) * 0.5;
+            string apGSinfo = $"\nLowest 3 energy in AP:\n {apEigen[0].val - pGS}, {apEigen[1].val - pGS}, {apEigen[2].val - pGS}";
+
+            /// Pick up ensemble GS for each particle num
+            /// 
+
+            double p0GSE = 0.0;
+            double p1GSE = lDWF.Concat(lUWF).Concat(rDWF).Concat(rUWF).Select(x => x.energy).Min();
+            double p2GSE = apEigen.Concat(uuEigen).Concat(ddEigen).Select(x => x.val).Min();
+
+            string ensembleGSinfo = $"\nEnsemble GS energy for 0/1/2 particles:\n {p0GSE}, {p1GSE}, {p2GSE}";
+
             verbalReport +=                 
-                uuInfo + "\n" + 
-                udInfo + "\n" + 
-                duInfo + "\n" + 
-                ddInfo + "\n";
+                uuInfo + "\n"  + 
+                udInfo + "\n"  + 
+                duInfo + "\n"  + 
+                ddInfo + "\n"  +
+                ensembleGSinfo +
+                apGSinfo;
 
             File.WriteAllText(NnDQDJResultPath, $"\n{J}");
             File.WriteAllText(NnDQDJReportPath, verbalReport);
 
             return true;
+        }
+
+        public string[]? GetEnergies() {
+            if (!File.Exists(NnDQDJReportPath)) return null;
+            bool targetIsNextLine = false;
+            foreach (var line in File.ReadAllLines(NnDQDJReportPath)) {
+                if (targetIsNextLine) 
+                    return line.Splitter(",");                
+                if (line.Contains("Lowest 3 energy in "))
+                    targetIsNextLine = true;
+            }
+            return null;
         }
     }
 }

@@ -155,6 +155,8 @@ namespace NnManager {
             //     File.WriteAllText(Plan.FSPath.SubPath("BReport0323.txt"), result);
             // }
 
+            public void GenerateSomeReport0701() => Plan.GenerateSomeReport0701();
+
             public int TaskAmount =>
             Plan.Tasks.Count;
 

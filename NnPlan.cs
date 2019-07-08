@@ -20,7 +20,7 @@ namespace NnManager {
 
         Dictionary<NnParam, NnTask> tasks;
         // public IEnumerable<NnTask> Tasks => tasks.Values;
-        public ImmutableDictionary<NnParam, NnTask> Tasks => 
+        public ImmutableDictionary<NnParam, NnTask> Tasks =>
             tasks.ToImmutableDictionary();
 
         public int RunningTasks => tasks.Where(t => t.Value.IsBusy()).ToList().Count;
@@ -70,7 +70,7 @@ namespace NnManager {
             public SaveData(NnPlan plan) {
                 name = plan.Name;
                 Type = plan.Type;
-                taskIds = plan.tasks.ToDictionary(x => x.Key, x => x.Value.Name);                
+                taskIds = plan.tasks.ToDictionary(x => x.Key, x => x.Value.Name);
                 // consts = plan.Consts != null ?
                 //     new Dictionary<string, string>(plan.Consts) :
                 //     null;
@@ -131,7 +131,7 @@ namespace NnManager {
         public NnTask? AddTask(
             NnParam param
         ) {
-            var tasks = AddTask(new List<NnParam>{param});
+            var tasks = AddTask(new List<NnParam> { param });
             if (tasks?.Count() > 0) return tasks[0];
             else return null;
         }
@@ -141,7 +141,7 @@ namespace NnManager {
         ) {
             var newTasks = new Dictionary<NnParam, NnTask>();
             try {
-                foreach (var param in pars) {    
+                foreach (var param in pars) {
                     if (!param.Pad(Template))
                         continue;
 
@@ -157,7 +157,7 @@ namespace NnManager {
 
                     if (tasks.All(x => !x.Value.Equals(newTask)))
                         newTasks[param] = newTask;
-                }                
+                }
             } catch {
                 Util.ErrorHappend("Error while creating task!");
                 return new List<NnTask>();
@@ -166,7 +166,7 @@ namespace NnManager {
             try {
                 foreach (var newTask in newTasks)
                     tasks[newTask.Key] = newTask.Value;
-                
+
                 UpdateCommonData(newTasks.Keys.ToList());
 
                 OnPropertyChanged("Plan - AddTask");
@@ -193,14 +193,14 @@ namespace NnManager {
                         return false;
                     }
 
-                foreach(var item in tasks.Where(kvp => kvp.Value == task).ToList()) {
+                foreach (var item in tasks.Where(kvp => kvp.Value == task).ToList()) {
                     tasks.Remove(item.Key);
                     string path = FSPath.SubPath("tasks").SubPath("_removed").SubPath(task.Name);
                     while (Directory.Exists(path))
                         path += "_";
                     Directory.Move(task.FSPath, path);
                     DeleteParamInCommonData(item.Key);
-                }                
+                }
                 success = true;
             } catch {
                 Util.ErrorHappend("Error while deleting task!");
@@ -215,19 +215,19 @@ namespace NnManager {
             return success;
         }
 
-        Dictionary<string, Dictionary<string, int>>? paramDataStat;
+        Dictionary<string, Dictionary<string, int>> ? paramDataStat;
         public List<string> CommonData {
             get {
                 if (paramDataStat == null) {
                     paramDataStat = new Dictionary<string, Dictionary<string, int>>();
                     UpdateCommonData(tasks.Keys.ToList(), true);
                 }
-                
+
                 var result = new List<string>();
                 foreach (var param in paramDataStat)
                     if (param.Value.Count() <= 1)
                         result.Add(param.Key);
-                
+
                 return result;
             }
         }
@@ -238,11 +238,11 @@ namespace NnManager {
             if (paramDataStat == null) return;
             foreach (var par in pars)
                 foreach (var vari in par.Variables) {
-                    if (!paramDataStat.ContainsKey(vari.Key)) 
+                    if (!paramDataStat.ContainsKey(vari.Key))
                         paramDataStat[vari.Key] = new Dictionary<string, int>();
                     if (!paramDataStat[vari.Key].ContainsKey(vari.Value))
                         paramDataStat[vari.Key][vari.Value] = 1;
-                    else 
+                    else
                         paramDataStat[vari.Key][vari.Value] += 1;
                 }
         }
@@ -251,11 +251,11 @@ namespace NnManager {
             if (paramDataStat == null) return;
             foreach (var vari in par.Variables) {
                 if (paramDataStat.ContainsKey(vari.Key))
-                if (paramDataStat[vari.Key].ContainsKey(vari.Value)) {
-                    paramDataStat[vari.Key][vari.Value] -= 1;
-                    if (paramDataStat[vari.Key][vari.Value] <= 0)
-                        paramDataStat[vari.Key].Remove(vari.Value);
-                }
+                    if (paramDataStat[vari.Key].ContainsKey(vari.Value)) {
+                        paramDataStat[vari.Key][vari.Value] -= 1;
+                        if (paramDataStat[vari.Key][vari.Value] <= 0)
+                            paramDataStat[vari.Key].Remove(vari.Value);
+                    }
             }
         }
 
@@ -281,5 +281,27 @@ namespace NnManager {
         // public string GetReport(ReportType type, Dictionary<string, string> options) {
         //     return Report(type, options).Execute();
         // }
+
+        // FIXME: Temp func to get some report
+        public void GenerateSomeReport0701() {
+
+            string report = "EN,Vol_DET(V),Energy(eV)\n";
+            List<(string detVol, string[] ene)> entries = new List<(string, string[] ene)>();
+            foreach (var nnTask in Tasks) {
+                var param = nnTask.Key;
+                var task = nnTask.Value;
+
+                if (task.GetEnergies() is string[] taskEnergies)
+                    if (param.GetValue("Vol_DET") is string volDet)
+                        entries.Add((volDet, taskEnergies));
+            }
+
+            foreach (var i in new int[]{0, 1, 2}) 
+            foreach (var entry in entries) {
+                report += i + "," + entry.detVol + "," + entry.ene[i] + "\n";
+            }
+
+            File.WriteAllText(FSPath.SubPath("AntiCrossing.txt"), report);
+        }
     }
 }

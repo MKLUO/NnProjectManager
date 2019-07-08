@@ -370,7 +370,7 @@ namespace NnManager {
         //     return FFT(coulombSplit);
         // }
 
-        public static ScalarField CoulombPotential(ScalarField density) {
+        public static ScalarField CoulombPotential_BySolvingPoisson(ScalarField density) {
             var Constant = 4.0 * Math.PI * CoulombConstant();
 
             // Calculate laplacian
@@ -682,8 +682,16 @@ namespace NnManager {
 
 
             return Truncate(conv, 
-                (dimX/2, dimY/2, dimZ/2),
-                (dimX/2 - 1, dimY/2 - 1, dimZ/2 - 1)
+                (
+                    dimX - mask.GetLength(0), 
+                    dimY - mask.GetLength(1),
+                    dimZ - mask.GetLength(2)
+                ),
+                (
+                    mask.GetLength(0) - 1, 
+                    mask.GetLength(1) - 1,
+                    mask.GetLength(2) - 1
+                )
             );
 
             // return conv;
@@ -717,6 +725,9 @@ namespace NnManager {
             PinnedArray<Complex> pinnedOutput = new PinnedArray<Complex>(output);
 
             DFT.FFT(pinnedInput, pinnedOutput);
+            
+            pinnedInput.Dispose();
+            pinnedOutput.Dispose();
 
             // return Multiply(output, 1.0 / Math.Sqrt(dimX * dimY * dimZ));
             return output;
@@ -779,6 +790,9 @@ namespace NnManager {
             PinnedArray<Complex> pinnedOutput = new PinnedArray<Complex>(output);
 
             DFT.FFT(pinnedInput, pinnedOutput);
+            
+            pinnedInput.Dispose();
+            pinnedOutput.Dispose();
             
             // return Multiply(output, 1.0 / Math.Sqrt(dimX * dimY * dimZ));
             return Multiply(output, 1.0 / (dimX * dimY * dimZ));
