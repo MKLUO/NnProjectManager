@@ -15,6 +15,9 @@ namespace NnManager {
         readonly static string nnMainPath = "C:\\Program Files (x86)\\nextnano\\2015_08_19\\";
         readonly static string nnPPPath = "nextnano++\\bin 64bit\\nextnano++_Intel_64bit.exe";
         readonly static string nn3Path = "nextnano3\\Intel 64bit\\nextnano3_Intel_64bit.exe";
+        readonly static string nnPPDBPath = "nextnano++\\Syntax\\database_nnp.in\"";
+        readonly static string nn3DBPath = "nextnano3\\Syntax\\database_nn3.in\"";
+
         readonly public static string inputFileName = "nnInput.in";
         readonly public static string inputRefFileName = "_nnInput.in";
         readonly public static string logFileName = "nnInput.log";
@@ -30,16 +33,23 @@ namespace NnManager {
                     content);                    
 
                 string exePath = "";
+                string dBPath = "";
                 switch (type) {
-                    case NnType.Nn3: exePath = nn3Path; break;
-                    case NnType.NnPP: exePath = nnPPPath; break;
+                    case NnType.Nn3: 
+                        exePath = nn3Path; 
+                        dBPath = nn3DBPath;
+                        break;
+                    case NnType.NnPP: 
+                        exePath = nnPPPath;
+                        dBPath = nnPPDBPath;
+                        break;
                 }
                 if (exePath == "") throw new Exception();
                 
                 Util.StartAndWaitProcess(
                     nnMainPath + exePath,
                     " -s --license \"" + nnMainPath + "License\\license.txt\"" +
-                    " --database \"" + nnMainPath + "nextnano++\\Syntax\\database_nnp.in\"" +
+                    " --database \"" + nnMainPath + dBPath +
                     " --outputdirectory \"" + path + "\"" +
                     " --noautooutdir -log \"" + path.SubPath(inputFileName),
                     ct
@@ -60,16 +70,23 @@ namespace NnManager {
                     content);
 
                 string exePath = "";
+                string dBPath = "";
                 switch (type) {
-                    case NnType.Nn3: exePath = nn3Path; break;
-                    case NnType.NnPP: exePath = nnPPPath; break;
+                    case NnType.Nn3: 
+                        exePath = nn3Path; 
+                        dBPath = nn3DBPath;
+                        break;
+                    case NnType.NnPP: 
+                        exePath = nnPPPath;
+                        dBPath = nnPPDBPath;
+                        break;
                 }
                 if (exePath == "") throw new Exception();
 
                 Util.StartAndWaitProcess(
                     nnMainPath + exePath,
                     " --license \"" + nnMainPath + "License\\license.txt\"" +
-                    " --database \"" + nnMainPath + "nextnano++\\Syntax\\database_nnp.in\"" +
+                    " --database \"" + nnMainPath + dBPath +
                     " --outputdirectory \"" + path + "\"" +
                     " --noautooutdir -log \"" + path.SubPath(inputFileName),
                     ct

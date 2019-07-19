@@ -12,8 +12,8 @@ using System.Threading;
 namespace NnManager {
     using RPath = Util.RestrictedPath; 
 
-    partial class NnTask {   
-
+    partial class NnTask {
+        
         RPath NnDQDReportPath       => FSPath.SubPath("NnDQDReport");
         RPath NnDQDReportAllPath    => NnDQDReportPath.SubPath("_AnnotatedSpectrum.dat");
         RPath NnDQDReportEnergyPath => NnDQDReportPath.SubPath("_BoundStateEnergy.dat");
@@ -44,7 +44,7 @@ namespace NnManager {
 
         string NnDQDReportGetResult() => File.ReadAllText(NnDQDReportMiscPath);
 
-        bool NnDQDReportExecute(CancellationToken ct, ImmutableDictionary<string, string> options) {            
+        bool NnDQDReportExecute(CancellationToken ct, ImmutableDictionary<string, string> options) {
 
             //==========Clearing old outputs==========
             if (NnDQDReportPath.Exists())
@@ -65,7 +65,6 @@ namespace NnManager {
                 // FIXME: Bands other than X1 is not implemented yet!
                 return false;
             }
-
 
 
             //==========Categorize 1d & 2d data (1d & 2d are not needed)==========
