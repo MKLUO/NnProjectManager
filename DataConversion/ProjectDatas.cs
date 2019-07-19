@@ -27,6 +27,13 @@ namespace NnManager {
             IRefCompare<NnPlanData>, 
             IRefFind<NnPlan>
         {
+            
+            protected override Dictionary<string, List<string>>? Derivatives =>
+                new Dictionary<string, List<string>>
+                {
+                    {"Status", new List<string>{
+                        "BusyTaskAmount"}}
+                };
 
             NnPlan Plan { get; }
             public string Id => Plan.Name;
@@ -51,32 +58,32 @@ namespace NnManager {
                         yield return data;
                     }
                 }
-            }
+            }            
+            
+            public NnParamForm GetParamForm() =>
+                new NnParamForm(
+                    Plan.Template.Variables,
+                    null,
+                    Plan.CommonData
+                );
 
-            public NnParamForm ParamForm(NnTaskData? task = null) {
+            public NnParamForm GetTaskParamForm(NnTaskData? task = null) {
                 if (task == null) {
-                    if (Plan.Consts == null)
-                        return new NnParamForm(
-                            Plan.Template.Variables,
-                            Plan.Template.Consts
-                        );
-                    else
-                        return new NnParamForm(
-                            Plan.Template.Variables,
-                            Plan.Template.Consts,
-                            new NnParam(
-                                Plan.Template.Variables.ToDictionary(
-                                    x => x.Key,
-                                    x => x.Value ?? 0.0
-                                ),
-                                new Dictionary<string, string>(Plan.Consts)
+                    return new NnParamForm(
+                        Plan.Template.Variables,
+                        new NnParam(
+                            Plan.Template.Variables.ToDictionary(
+                                x => x.Key,
+                                x => x.Value ?? ""
                             )
-                        );
+                        ),
+                        Plan.CommonData
+                    );
                 } else {
                     return new NnParamForm(
                         Plan.Template.Variables,
-                        Plan.Template.Consts,
-                        task.Param
+                        task.Param,
+                        Plan.CommonData           
                     );
                 }
             }
@@ -111,14 +118,15 @@ namespace NnManager {
                 return false;
             }
 
-            public void QueueModule(NnModuleForm mData) {
+            public void QueueModule(NnModuleForm mData, bool force = false) {
                 foreach (var task in Plan.Tasks.Values) {
-                    task.QueueModule(
-                        new NnModuleRecord(
-                            mData.Type,
-                            mData.OptionsResult
-                        )
-                    );
+                    if (force || (task.Modules.Where(x => x.Type == mData.Type).Count() == 0))
+                        task.QueueModule(
+                            new NnModuleRecord(
+                                mData.Type,
+                                new Dictionary<string, string>(mData.OptionsResult)
+                            )
+                        );
                 }
             }
 
@@ -127,6 +135,27 @@ namespace NnManager {
                     task.ClearModules();
                 }
             }
+
+            // // HACK!
+            // public void GenerateTReport0323() {
+            //     string result = Plan.GetReport(ReportType.Occup2D, new Dictionary<string, string>{
+            //         {"X", "T"},
+            //         {"Y", "vol_TD"}
+            //     });
+
+            //     File.WriteAllText(Plan.FSPath.SubPath("TReport0323.txt"), result);
+            // }
+            // // HACK!
+            // public void GenerateBReport0323() {
+            //     string result = Plan.GetReport(ReportType.Occup2D, new Dictionary<string, string>{
+            //         {"X", "B"},
+            //         {"Y", "vol_TD"}
+            //     });
+
+            //     File.WriteAllText(Plan.FSPath.SubPath("BReport0323.txt"), result);
+            // }
+
+            public void GenerateSomeReport0701() => Plan.GenerateSomeReport0701();
 
             public int TaskAmount =>
             Plan.Tasks.Count;
@@ -146,6 +175,7 @@ namespace NnManager {
             IRefCompare<NnTaskData>, 
             IRefFind<NnTask>
         {
+            
 
             NnTask Task { get; }
             public string Id => Task.Name;
@@ -164,15 +194,28 @@ namespace NnManager {
             public bool IsRef(NnTask data) =>
                 this.Task == data;
 
+            public NnModuleForm GetModuleForm(ModuleType type) {
+                return new NnModuleForm(
+                    new NnModuleRecord(
+                        type,
+                        Task.BuiltInModuleOptions[type]
+                    )
+                );
+            }
+
             public void QueueModule(NnModuleForm mData) =>
                 Task.QueueModule(
                     new NnModuleRecord(
                         mData.Type,
-                        mData.OptionsResult
+                        new Dictionary<string, string>(mData.OptionsResult)
                     )
                 );
 
             public void ClearModules() => Task.ClearModules();
+
+            public void Launch() => Task.TryDequeueAndRunModule();
+
+            public void Terminate() => Task.Terminate();
 
             // public string ModuleDone {
             //     get {
@@ -227,7 +270,8 @@ namespace NnManager {
         {
 
             NnTemplate Template { get; }
-            public string Id => Template.Name;
+            public string Id => $"({Template.Type}) " + Template.Name;
+            // public NnType Type => Template.Type;
 
             public NnTemplateData(NnTemplate template) {
                 this.Template = template;
@@ -241,10 +285,9 @@ namespace NnManager {
             this.Template == data;
 
             public NnParamForm GetForm() =>
-            new NnParamForm(
-                Template.Variables,
-                Template.Consts
-            );
+                new NnParamForm(
+                    Template.Variables
+                );
         }
 
         public class Variable {
@@ -262,50 +305,46 @@ namespace NnManager {
         public class NnParamForm {
 
             public bool IsFilled =>
-                (Consts.Count + Variables.Count == 0) ||
-                ((Consts.Where(x => (x.Value ?? x.Default) == null).Count() == 0) &&
-                    (Variables.Where(x => (x.Value ?? x.Default) == null).Count() == 0));
+                (Variables.Count == 0) ||
+                (Variables.Where(
+                    x => (x.Value ?? x.Default) == null
+                ).Count() == 0);
 
-            public bool FixConst { get; }
             public ImmutableList<Variable> Variables { get; }
-            public ImmutableList<Variable> Consts { get; }
+            public ImmutableList<Variable> CommonVariables { get; }
 
             public NnParamForm(
-                ImmutableDictionary<string, double?> variableDefaults,
-                ImmutableDictionary<string, string?> constDefaults,
-                NnParam? param = null
+                ImmutableDictionary<string, string?> variableDefaults,
+                NnParam? param = null,
+                List<string>? keysOfCommonData = null
             ) {
-                this.FixConst = param != null;
 
                 var variables = new List<Variable>();
-                var consts = new List<Variable>();
+                var commonVariables = new List<Variable>();
 
-                foreach (var item in constDefaults)
-                    consts.Add(
-                        new Variable(
-                            item.Key,
-                            item.Value,
-                            param?.Get(item.Key)));
-
-                foreach (var item in variableDefaults)
-                    variables.Add(
-                        new Variable(
-                            item.Key,
-                            item.Value?.ToString(),
-                            param?.Get(item.Key)));
+                var paramVariables = param?.Variables;
+                foreach (var key in variableDefaults.Keys)
+                    if (keysOfCommonData?.Contains(key) ?? false)
+                        commonVariables.Add(
+                            new Variable(
+                                key,
+                                variableDefaults[key],
+                                paramVariables?[key]));
+                    else 
+                        variables.Add(
+                            new Variable(
+                                key,
+                                variableDefaults[key],
+                                paramVariables?[key]));
 
                 this.Variables = variables.ToImmutableList();
-                this.Consts = consts.ToImmutableList();
+                this.CommonVariables = commonVariables.ToImmutableList();
             }
 
             public NnParam? ToNnParam() {
                 try {
                     return new NnParam(
-                        Variables.ToDictionary(
-                            x => x.Name,
-                            x => Convert.ToDouble(x.Value ?? x.Default)
-                        ),
-                        Consts.ToDictionary(
+                        Variables.Concat(CommonVariables).ToDictionary(
                             x => x.Name,
                             x => x.Value ?? x.Default ??
                             throw new Exception()
@@ -354,18 +393,26 @@ namespace NnManager {
                 this.Options = options.ToImmutableList();
             }
 
+            // FIXME: TOO MUCH logic in projectdata
             public NnModuleForm(                
                 NnModuleRecord record
             ) {
                 this.Type = record.Type;
 
                 var options = new List<Variable>();
-                foreach (var item in NnModule.GetDefaultOptions(record.Type))
+                var defaultOptions = NnModule.GetDefaultOptions(record.Type);
+                foreach (var item in defaultOptions)
                     options.Add(
                         new Variable(
                             item.Key,
                             item.Value,
-                            record.Options?[item.Key]));
+                            record.Options != null ?
+                                (record.Options.ContainsKey(item.Key) ? 
+                                    record.Options[item.Key] :
+                                    null) :
+                                null
+                            )
+                        );
 
                 this.Options = options.ToImmutableList();
                 this.Result = record.Result;

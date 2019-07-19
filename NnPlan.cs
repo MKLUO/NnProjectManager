@@ -2,10 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
-
-
-
 
 #nullable enable
 
@@ -18,11 +16,11 @@ namespace NnManager {
         public RPath FSPath { get; }
         public NnTemplate Template { get; }
         public PlanType Type { get; }
-        public ImmutableDictionary<string, string> ? Consts { get; private set; }
+        // public ImmutableDictionary<string, string> ? Consts { get; private set; }
 
         Dictionary<NnParam, NnTask> tasks;
         // public IEnumerable<NnTask> Tasks => tasks.Values;
-        public ImmutableDictionary<NnParam, NnTask> Tasks => 
+        public ImmutableDictionary<NnParam, NnTask> Tasks =>
             tasks.ToImmutableDictionary();
 
         public int RunningTasks => tasks.Where(t => t.Value.IsBusy()).ToList().Count;
@@ -50,14 +48,14 @@ namespace NnManager {
             RPath path,
             NnTemplate template,
             Dictionary<NnParam, NnTask> tasks,
-            ImmutableDictionary<string, string> ? consts,
+            // ImmutableDictionary<string, string> ? consts,
             PlanType type
         ) {
             this.Name = name;
             this.FSPath = path;
             this.Template = template;
             this.tasks = tasks;
-            this.Consts = consts;
+            // this.Consts = consts;
             this.Type = type;
 
             KernelInitialize();
@@ -72,16 +70,16 @@ namespace NnManager {
             public SaveData(NnPlan plan) {
                 name = plan.Name;
                 Type = plan.Type;
-                taskIds = plan.tasks.ToDictionary(x => x.Key, x => x.Value.Name);                
-                consts = plan.Consts != null ?
-                    new Dictionary<string, string>(plan.Consts) :
-                    null;
+                taskIds = plan.tasks.ToDictionary(x => x.Key, x => x.Value.Name);
+                // consts = plan.Consts != null ?
+                //     new Dictionary<string, string>(plan.Consts) :
+                //     null;
             }
 
             readonly public string name;
             readonly public PlanType Type;
             readonly public Dictionary<NnParam, string> taskIds;
-            readonly public Dictionary<string, string> ? consts;
+            // readonly public Dictionary<string, string> ? consts;
         }
 
         void Save() {
@@ -118,7 +116,7 @@ namespace NnManager {
                     path,
                     template,
                     tasks,
-                    planData.consts?.ToImmutableDictionary(),
+                    // planData.consts?.ToImmutableDictionary(),
                     planData.Type
                 );
 
@@ -133,54 +131,60 @@ namespace NnManager {
         public NnTask? AddTask(
             NnParam param
         ) {
+            var tasks = AddTask(new List<NnParam> { param });
+            if (tasks?.Count() > 0) return tasks[0];
+            else return null;
+        }
+
+        public List<NnTask> AddTask(
+            List<NnParam> pars
+        ) {
+            var newTasks = new Dictionary<NnParam, NnTask>();
             try {
-                if (!param.Pad(Template))
-                    return null;
+                foreach (var param in pars) {
+                    if (!param.Pad(Template))
+                        continue;
 
-                if (Consts != null)
-                    if (!NnParam.HasConsts(param, Consts)) {
-                        Util.ErrorHappend("Constants in parameter mismatch!");
-                        return null;
-                    }
+                    string tag = param.GetTag(Template.Variables);
+                    NnTask newTask =
+                        new NnTask(
+                            tag,
+                            Template.Type,
+                            FSPath.SubPath("tasks").SubPath(tag),
+                            Template.GenerateContent(param.Variables),
+                            Template.GenerateModuleOptions(param.Variables)
+                        );
 
-                foreach (var task in tasks)
-                    if (task.Key.GetTag() == param.GetTag()) {
-                        Util.ErrorHappend("Task with same parameter exists!");
-                        return null;
-                    }
+                    if (tasks.All(x => !x.Value.Equals(newTask)))
+                        newTasks[param] = newTask;
+                }
+            } catch {
+                Util.ErrorHappend("Error while creating task!");
+                return new List<NnTask>();
+            }
 
-                string newContent;
-                NnTask newTask =
-                    new NnTask(
-                        param.GetTag(),
-                        FSPath.SubPath("tasks").SubPath(param.GetTag()),
-                        newContent = Template.GenerateContent(param.Content)
-                    );
+            try {
+                foreach (var newTask in newTasks)
+                    tasks[newTask.Key] = newTask.Value;
 
-                foreach (var oldTask in tasks)
-                    if (oldTask.Value.Equals(newTask)) {
-                        Util.ErrorHappend("Same task exists!");
-                        return null;
-                    }
-
-                tasks[param] = newTask;
+                UpdateCommonData(newTasks.Keys.ToList());
 
                 OnPropertyChanged("Plan - AddTask");
                 OnPropertyChanged("TaskAmount");
                 OnPropertyChanged("BusyTaskAmount");
 
-                Consts = param.Consts.ToImmutableDictionary();
                 Save();
-                return newTask;
+                return newTasks.Values.ToList();
             } catch {
                 Util.ErrorHappend("Error while adding task!");
-                return null;
+                return newTasks.Values.ToList();
             }
         }
 
         public bool DeleteTask(
             NnTask task
         ) {
+            bool success = false;
             try {
                 if (task.IsBusy())
                     if (Util.WarnAndDecide("Selected task is busy rn. Terminate and delete?")) {
@@ -189,18 +193,69 @@ namespace NnManager {
                         return false;
                     }
 
-                foreach(var item in tasks.Where(kvp => kvp.Value == task).ToList())
+                foreach (var item in tasks.Where(kvp => kvp.Value == task).ToList()) {
                     tasks.Remove(item.Key);
-
+                    string path = FSPath.SubPath("tasks").SubPath("_removed").SubPath(task.Name);
+                    while (Directory.Exists(path))
+                        path += "_";
+                    Directory.Move(task.FSPath, path);
+                    DeleteParamInCommonData(item.Key);
+                }
+                success = true;
+            } catch {
+                Util.ErrorHappend("Error while deleting task!");
+                success = false;
+            } finally {
                 OnPropertyChanged("Plan - DeleteTask");
                 OnPropertyChanged("TaskAmount");
                 OnPropertyChanged("BusyTaskAmount");
 
                 Save();
-                return true;
-            } catch {
-                Util.ErrorHappend("Error while deleting task!");
-                return false;
+            }
+            return success;
+        }
+
+        Dictionary<string, Dictionary<string, int>> ? paramDataStat;
+        public List<string> CommonData {
+            get {
+                if (paramDataStat == null) {
+                    paramDataStat = new Dictionary<string, Dictionary<string, int>>();
+                    UpdateCommonData(tasks.Keys.ToList(), true);
+                }
+
+                var result = new List<string>();
+                foreach (var param in paramDataStat)
+                    if (param.Value.Count() <= 1)
+                        result.Add(param.Key);
+
+                return result;
+            }
+        }
+
+        void UpdateCommonData(List<NnParam> pars, bool reset = false) {
+            if (reset) paramDataStat = new Dictionary<string, Dictionary<string, int>>();
+            if (pars.Count == 0) return;
+            if (paramDataStat == null) return;
+            foreach (var par in pars)
+                foreach (var vari in par.Variables) {
+                    if (!paramDataStat.ContainsKey(vari.Key))
+                        paramDataStat[vari.Key] = new Dictionary<string, int>();
+                    if (!paramDataStat[vari.Key].ContainsKey(vari.Value))
+                        paramDataStat[vari.Key][vari.Value] = 1;
+                    else
+                        paramDataStat[vari.Key][vari.Value] += 1;
+                }
+        }
+
+        void DeleteParamInCommonData(NnParam par) {
+            if (paramDataStat == null) return;
+            foreach (var vari in par.Variables) {
+                if (paramDataStat.ContainsKey(vari.Key))
+                    if (paramDataStat[vari.Key].ContainsKey(vari.Value)) {
+                        paramDataStat[vari.Key][vari.Value] -= 1;
+                        if (paramDataStat[vari.Key][vari.Value] <= 0)
+                            paramDataStat[vari.Key].Remove(vari.Value);
+                    }
             }
         }
 
@@ -211,17 +266,42 @@ namespace NnManager {
 
         // TODO: implement priority here
         public bool DoWork() {
-            kernel?.Step();
-            foreach (var task in tasks.Values)
-                if (task.TryDequeueAndRunModule())
-                    return true;
-            return false;
+            bool suc = kernel?.Step() ?? false;
+            if (suc) OnPropertyChanged("BusyTaskAmount");
+            return suc;
         }
 
         public bool IsBusy() {
             foreach (NnTask task in tasks.Values)
                 if (task.IsBusy()) return true;
             return false;
+        }
+
+        // FIXME: Ignoring multiple module of same type!
+        // public string GetReport(ReportType type, Dictionary<string, string> options) {
+        //     return Report(type, options).Execute();
+        // }
+
+        // FIXME: Temp func to get some report
+        public void GenerateSomeReport0701() {
+
+            string report = "EN,Vol_DET(V),Energy(eV)\n";
+            List<(string detVol, string[] ene)> entries = new List<(string, string[] ene)>();
+            foreach (var nnTask in Tasks) {
+                var param = nnTask.Key;
+                var task = nnTask.Value;
+
+                if (task.GetEnergies() is string[] taskEnergies)
+                    if (param.GetValue("Vol_DET") is string volDet)
+                        entries.Add((volDet, taskEnergies));
+            }
+
+            foreach (var i in new int[]{0, 1, 2}) 
+            foreach (var entry in entries) {
+                report += i + "," + entry.detVol + "," + entry.ene[i] + "\n";
+            }
+
+            File.WriteAllText(FSPath.SubPath("AntiCrossing.txt"), report);
         }
     }
 }

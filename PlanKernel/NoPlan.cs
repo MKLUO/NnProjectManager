@@ -19,6 +19,11 @@ namespace NnManager {
                 options ?? new Dictionary<string, string>()
             );
 
-        void NoPlanStep() {}
+        bool NoPlanStep() {
+            foreach (var task in tasks.Values)
+                if (task.TryDequeueAndRunModule())
+                    return true;
+                return false;
+        }
     }
 }

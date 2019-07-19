@@ -110,6 +110,8 @@ namespace NnManager {
 
                 return new RestrictedPath(resultPath, create);
             }
+
+            public bool Exists() => Directory.Exists(path) || File.Exists(path);
         }
 
         #region log
@@ -177,11 +179,17 @@ namespace NnManager {
                 process.StartInfo.FileName = fileName;
                 process.StartInfo.Arguments = arguments;
                 process.StartInfo.UseShellExecute = false;
+                process.StartInfo.CreateNoWindow = true;
 
-                ct.Register(() => process.Kill());
+                var reg = ct.Register(() => {
+                    if (!process.HasExited)
+                        process.Kill();
+                });
 
                 process.Start();
                 process.WaitForExit();
+
+                reg.Dispose();
             }
         }
 
@@ -272,10 +280,17 @@ namespace NnManager {
             return Regex.Replace(input, "[ |\t|\r|\n]+", "");
         }
 
+        // public static string[] Splitter(this string input, string delim, bool excludeDelim = false) {
         public static string[] Splitter(this string input, string delim) {
+            // if (excludeDelim)
+            //     return Regex.Split(input, delim)
+            //         .Where(s => s != String.Empty)
+            //         .Where(s => !Regex.IsMatch(s, delim))
+            //         .ToArray<string>();
+            // else 
             return Regex.Split(input, delim)
-                    .Where(s => s != String.Empty)
-                    .ToArray<string>();
+                .Where(s => s != String.Empty)
+                .ToArray<string>();
         }
     }
 }

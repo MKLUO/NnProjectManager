@@ -29,7 +29,7 @@ namespace NnManager {
         }
 
         // FIXME: maxConcurrentTaskCount
-        const int maxConcurrentTaskCount = 4;
+        const int maxConcurrentTaskCount = 2;
         int CurrentTaskCount => plans.Sum(x => x.RunningTasks);
 
         Task? scheduler;
@@ -142,26 +142,6 @@ namespace NnManager {
             NnTemplate template
         ) {
             try {
-                // if (templates.Contains(id))
-                //     if (!Util.WarnAndDecide("Template with same name exists. Replace it?")) {
-                //         return false;
-                //     } else if (!DeleteTemplate(id)) {
-                //         return false;
-                //     }
-
-                // NnTemplate? newTamplate =
-                //     NnTemplate.NewTemplate(content);
-
-                // if (newTamplate == null) {
-                //     Util.ErrorHappend("Error while adding template!");
-                //     return false;
-                // }
-
-                // foreach (NnTemplate oldTemplate in templates.Values) 
-                //     if (oldTemplate.Equals(newTamplate)) {
-                //         Util.ErrorHappend("Same template exists!");
-                //         return false;
-                //     }
                 templates.Add(template);
                 OnPropertyChanged("Model - AddTemplate");
 
@@ -222,6 +202,7 @@ namespace NnManager {
         public bool DeletePlan(
             NnPlan plan
         ) {
+            bool success = false;
             try {
                 if (!plans.Contains(plan))
                     return false;
@@ -235,15 +216,21 @@ namespace NnManager {
                     } else return false;
 
                 plans.Remove(plan);
-                OnPropertyChanged("Model - DeletePlan");
 
-                Save();
-                return true;
-                
+                // FIXME: clutter!
+                string path = FSPath.SubPath("plans").SubPath("_removed").SubPath(plan.Name);
+                while (Directory.Exists(path))
+                    path += "_";
+                Directory.Move(plan.FSPath, path);
+                success = true;                
             } catch {
                 Util.ErrorHappend("Error while deleting plan!");
-                return false;                
+                success = false;                
+            } finally {
+                OnPropertyChanged("Model - DeletePlan");
+                Save();
             }
+            return success;
         }
 
         public void Terminate() {
@@ -285,5 +272,5 @@ namespace NnManager {
 
             return false;
         }
-    }
+    }    
 }

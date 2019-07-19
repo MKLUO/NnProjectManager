@@ -2,6 +2,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>8.0</LangVersion>
+    <NullableContextOptions>enable</NullableContextOptions>
   </PropertyGroup>
   <ItemGroup>
   </ItemGroup>
@@ -9,5 +10,9 @@
     <PackageReference Include="Sdcb.System.Range" Version="*"/>
     <PackageReference Include="System.Collections.Immutable" Version="*"/>
     <PackageReference Include="System.Collections.Immutable.Surrogate" Version="*"/>
+    <PackageReference Include="FFTW.NET" Version="1.0.1"/>
+    <Reference Include="alglibnet2">
+      <HintPath>..\ThirdParty\alglibnet2.dll</HintPath>
+    </Reference>
   </ItemGroup>
 </Project>

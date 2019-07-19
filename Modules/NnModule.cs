@@ -15,8 +15,12 @@ namespace NnManager {
     [Serializable]
     public enum ModuleType {
         NnMain,
-        NnOccup,
-        TestOpenNotepad
+        // NnOccup,
+        NnDQDReport,
+        NnDQDJ,
+        // NnDen2DEG,
+        // TestOpenNotepad,
+        Dummy
     }    
 
     partial class NnTask {
@@ -28,34 +32,25 @@ namespace NnManager {
             switch (type) {
                 case ModuleType.NnMain:
                     module = NnMain(options); break;
-                case ModuleType.NnOccup:
-                    module = NnOccup(options); break;
-                case ModuleType.TestOpenNotepad:
-                    module = TestOpenNotepad(options); break;
-                default: throw new Exception();                
+                // case ModuleType.NnOccup:
+                //     module = NnOccup(options); break;
+                // case ModuleType.NnDen2DEG:
+                //     module = NnDen2DEG(options); break;
+                case ModuleType.NnDQDReport:
+                    module = NnDQDReport(options); break;
+                case ModuleType.NnDQDJ:
+                    module = NnDQDJ(options); break;
+                // case ModuleType.TestOpenNotepad:
+                //     module = TestOpenNotepad(options); break;
+
+                default: 
+                    module = Dummy(options); break;
             }
             return module;
         }
-    }
-    
-    [Serializable]
-    public class NnModuleRecord {
-        public ModuleType Type { get; }
-        public Dictionary<string, string> Options { get; }
-        public string? Result { get; private set; }
 
-        public NnModuleRecord(
-            ModuleType type, 
-            ImmutableDictionary<string, string> options,
-            string? result = null
-        ) {
-            Type = type;
-            Options = new Dictionary<string, string>(options);
-            Result = result;
-        }
-
-        public void SetResult(string result) =>
-            Result = result;
+        public static ImmutableDictionary<string, string> NoOption =>
+            new Dictionary<string, string>{}.ToImmutableDictionary();
     }
 
     public class NnModule {
@@ -65,13 +60,18 @@ namespace NnManager {
 
         public static ImmutableDictionary<string, string> GetDefaultOptions(ModuleType type) {
             switch (type) {
-                case ModuleType.NnMain:
-                    return NnTask.NnMainDefaultOption;
-                case ModuleType.NnOccup:
-                    return NnTask.NnOccupDefaultOption;
-                case ModuleType.TestOpenNotepad:
-                    return NnTask.TestOpenNotepadDefaultOption;
-                default: throw new Exception();
+                // case ModuleType.NnOccup:
+                //     return NnTask.NnOccupDefaultOption;
+                // case ModuleType.NnDen2DEG:
+                //     return NnTask.NnDen2DEGDefaultOption;
+                case ModuleType.NnDQDReport:
+                    return NnTask.NnDQDReportDefaultOption;    
+                case ModuleType.NnDQDJ:
+                    return NnTask.NnDQDJDefaultOption;    
+                // case ModuleType.TestOpenNotepad:
+                //     return NnTask.TestOpenNotepadDefaultOption;
+                default: 
+                    return NnTask.NoOption;
             }
         }        
 
@@ -127,6 +127,27 @@ namespace NnManager {
         Func<string> getResult;
         public string GetResult() => getResult();
     }
+        
+    [Serializable]
+    public class NnModuleRecord {
+        public ModuleType Type { get; }
+        public Dictionary<string, string> Options { get; }
+        public string? Result { get; private set; }
+
+        public NnModuleRecord(
+            ModuleType type, 
+            Dictionary<string, string> options,
+            string? result = null
+        ) {
+            Type = type;
+            Options = new Dictionary<string, string>(options);
+            Result = result;
+        }
+
+        public void SetResult(string result) =>
+            Result = result;
+    }
+
 
     public abstract class LogBase {
         // public LogBase() { }

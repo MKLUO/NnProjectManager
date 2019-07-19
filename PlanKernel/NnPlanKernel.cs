@@ -13,7 +13,8 @@ namespace NnManager {
         
     public enum PlanType {
         NoPlan,
-        CBDiamond
+        CBDiamond,
+        FixDensity2DEG
     }
 
     partial class NnPlan {        
@@ -27,6 +28,10 @@ namespace NnManager {
                 case PlanType.CBDiamond:
                     kernel = CBDiamond();
                     return;
+
+                case PlanType.FixDensity2DEG:
+                    kernel = FixDensity2DEG();
+                    return;
             }
         }
     }
@@ -37,7 +42,7 @@ namespace NnManager {
         // protected abstract Dictionary<string, string> Options { get; }
 
         public NnPlanKernel(
-            Action step, 
+            Func<bool> step, 
             Dictionary<string, string>? options = null
         ) {
             this.step = step;
@@ -46,7 +51,7 @@ namespace NnManager {
 
         Dictionary<string, string> Options { get; }
 
-        Action step;
-        public void Step() => step();
+        Func<bool> step;
+        public bool Step() => step();
     }
 }

@@ -13,19 +13,19 @@ namespace NnManager {
 
     partial class NnPlan {
 
-        NnPlanKernel CBDiamond(Dictionary<string, string>? options = null) =>
+        NnPlanKernel FixDensity2DEG(Dictionary<string, string>? options = null) =>
             new NnPlanKernel(
-                CBDiamondStep, 
+                FixDensity2DEGStep, 
                 options ?? new Dictionary<string, string>()
             );
 
-        List<NnParam> Window = new List<NnParam>();
-        List<NnParam> History = new List<NnParam>();
+        List<NnParam> WindowDen2DEG = new List<NnParam>();
+        List<NnParam> HistoryDen2DEG = new List<NnParam>();
 
-        // FIXME: CB logic
+        // FIXME: Density2DEG logic
         // FIXME: Memory management!
         // FIXME: Care! Amount of newly generated tasks shouldn't exceed consumed(?) ones.
-        bool CBDiamondStep() {
+        bool FixDensity2DEGStep() {
 
             // Look for new task completed. (If only few is completed, skip this entire step)
 
@@ -33,7 +33,7 @@ namespace NnManager {
 
             // Look for new task completed.
 
-            return NoPlanStep();            
+            return NoPlanStep();  
         }
     }
 }
