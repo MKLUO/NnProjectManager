@@ -40,7 +40,7 @@ namespace NnManager {
                     vec[j] = new Complex(z[j,i].x, z[j,i].y);
                 result.Add((vec, w[i]));
             }
-
+//====hfeufuwfg
 
             return result;
         }
