@@ -349,10 +349,13 @@ namespace NnManager {
                 foreach (string token in tokens) {
                     if (token[0] == tokenVariable.Last()) {
                         string var = token.Substring(1);
-                        if (DerivedVariables.ContainsKey(var))
+                        if (DerivedVariables.ContainsKey(var)) {
                             // eval += DerivedVariables[var];
-                            eval += $"({DerivedVariables[var]})";
-                        else if (param.ContainsKey(var))
+                            if (DerivedVariables[var][0] == '[')
+                                eval += $"{DerivedVariables[var]}";
+                            else
+                                eval += $"({DerivedVariables[var]})";
+                        } else if (param.ContainsKey(var))
                             eval += param[var];
                         else if (Variables.ContainsKey(var))
                             eval += Variables[var];
