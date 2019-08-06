@@ -20,6 +20,7 @@ namespace NnManager {
         NnDQDJ,
         // NnDen2DEG,
         // TestOpenNotepad,
+        Nn3LegsTest,
         Dummy
     }    
 
@@ -42,7 +43,8 @@ namespace NnManager {
                     module = NnDQDJ(options); break;
                 // case ModuleType.TestOpenNotepad:
                 //     module = TestOpenNotepad(options); break;
-
+                case ModuleType.Nn3LegsTest:
+                    module = Nn3LegsTest(options); break;
                 default: 
                     module = Dummy(options); break;
             }
@@ -70,6 +72,8 @@ namespace NnManager {
                     return NnTask.NnDQDJDefaultOption;    
                 // case ModuleType.TestOpenNotepad:
                 //     return NnTask.TestOpenNotepadDefaultOption;
+                case ModuleType.Nn3LegsTest:
+                    return NnTask.Nn3LegsTestDefaultOption;    
                 default: 
                     return NnTask.NoOption;
             }
