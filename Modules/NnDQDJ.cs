@@ -4,14 +4,14 @@ using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Numerics;
-using System.Text.RegularExpressions;
+// using System.Text.RegularExpressions;
 using System.Threading;
 
 #nullable enable
 
 namespace NnManager {
     using RPath = Util.RestrictedPath;
-    using Dim = ScalarField.Dim;
+    // using Dim = ScalarField.Dim;
 
     partial class NnTask {
 
@@ -38,6 +38,7 @@ namespace NnManager {
                 { "z0", "-" },
                 { "z1", "-" },
                 { "order", "2" },
+                { "3particle", "no" },
                 { "enableFTDict", "no" }
             }.ToImmutableDictionary();
 
@@ -46,6 +47,10 @@ namespace NnManager {
         bool NnDQDJIsDone() => File.Exists(NnDQDJResultPath);
 
         string NnDQDJGetResult() => File.ReadAllText(NnDQDJResultPath);
+
+        public List<double> NnDQDJEnergies { get; private set; }
+
+        public int NnDQDJCS => NnDQDJEnergies.IndexOf(NnDQDJEnergies.Min());
 
         bool NnDQDJExecute(CancellationToken ct, ImmutableDictionary<string, string> options) {
 
@@ -180,7 +185,7 @@ namespace NnManager {
                         wfCollection[i].wf
                     );
                 }
-            
+
             //// Assemble WFs into pseudo densities (direct product) (den[i, j] = n(r) = <j| * |i>)
             /*
                 Since the spin basis chosen here is spin-z eigenbasis, 
@@ -205,6 +210,8 @@ namespace NnManager {
                         den[i, j] = wf1 * wf2.Conj();
                         den[j, i] = den[i, j].Conj();
                     }
+
+            // NOTE: 2-particle 
 
             //// 2-particle basis (notation: (spin-up WF, spin-down WF)) (ordering: left-GS, left-1stEX, ... , right-GS, right-1stEX, ...)
             //// Expected AP (1, 1) GSs: apb[order] (0, order), apb[2*order*order]       (order, 0)
@@ -231,13 +238,10 @@ namespace NnManager {
             var cHamUU = new Complex[pb.Count(), pb.Count()];
             var cHamDD = new Complex[pb.Count(), pb.Count()];
 
-            // FIXME: VERY DIRTY Coulomb calculation here!
-
-            options.TryGetValue("enableFTDict", out string? enableFTDicts);
-
+            // options.TryGetValue("enableFTDict", out string? enableFTDicts);
             Dictionary<Complex[, , ], Complex[, , ]> ? ftDict = null;
-            if (enableFTDicts == "yes")
-                ftDict = new Dictionary<Complex[, , ], Complex[, , ]>();
+            // if (enableFTDicts == "yes")
+            //     ftDict = new Dictionary<Complex[, , ], Complex[, , ]>();
 
             foreach (var(name, ham, cHam, basis, selCoef, denSet1, denSet2, spb1, spb2) in new [] {
                     ("AP", hamAP, cHamAP, apb, 0.0, denUp, denDown, uWF, dWF),
@@ -285,19 +289,104 @@ namespace NnManager {
                     }
             }
 
+            // NOTE: 3-particle 
+
+            options.TryGetValue("3particle", out string? do3Particle);
+            
+            double? p3GSE = null;
+            if (do3Particle == "yes") {
+                //// 3-particle basis (notation: (spin-up WF, spin-down WF)) (ordering: left-GS, left-1stEX, ... , right-GS, right-1stEX, ...)
+                var apb3 = new List < (int i, int j, int k, string name) > ();
+                for (int i = 0; i < order * 2; i++)
+                    for (int j = 0; j < order * 2; j++)
+                        for (int k = j + 1; k < order * 2; k++)
+                            apb3.Add((i, j, k, $""));
+
+                var pb3 = new List < (int i, int j, int k, string name) > ();
+                for (int i = 0; i < order * 2; i++)
+                    for (int j = i + 1; j < order * 2; j++)
+                        for (int k = j + 1; k < order * 2; k++)
+                            pb3.Add((i, j, k, $""));
+
+                var hamUUU = new Complex[pb3.Count(), pb3.Count()];
+                var hamDDD = new Complex[pb3.Count(), pb3.Count()];
+                var hamUDD = new Complex[apb3.Count(), apb3.Count()];
+                var hamDUU = new Complex[apb3.Count(), apb3.Count()];
+
+                Complex CircularCoulomb(ScalarField x, ScalarField y, ScalarField z) =>
+                    ScalarField.Coulomb(x, y, coulomb) +
+                    ScalarField.Coulomb(y, z, coulomb) +
+                    ScalarField.Coulomb(z, x, coulomb);
+
+                foreach (var(name, ham, basis, denSet1, denSet2, denSet3, spb1, spb2, spb3) in new [] {
+                        // ("UUU", hamUUU, pb3, denUp, denUp, denUp, uWF, uWF, uWF), // NOTE: UUU should never be GS
+                        ("DDD", hamDDD, pb3,  denDown, denDown, denDown, dWF, dWF, dWF),
+                        ("UDD", hamUDD, apb3, denUp,   denDown, denDown, uWF, dWF, dWF),
+                        ("DUU", hamDUU, apb3, denDown, denUp,   denUp,   dWF, uWF, uWF),
+                    }) 
+                {
+                    for (int i = 0; i < basis.Count(); i++)
+                        for (int j = i; j < basis.Count(); j++) {
+
+                            SetStatus($"Evaluating {name}({i},{j}) ...");
+
+                            var den11 = denSet1[basis[i].i, basis[j].i];
+                            var den22 = denSet2[basis[i].j, basis[j].j];
+                            var den33 = denSet3[basis[i].k, basis[j].k];
+
+                            var den12 = denSet1[basis[i].i, basis[j].j];
+                            var den23 = denSet2[basis[i].j, basis[j].k];
+                            var den31 = denSet3[basis[i].k, basis[j].i];
+
+                            var den13 = denSet1[basis[i].i, basis[j].k];
+                            var den21 = denSet2[basis[i].j, basis[j].i];
+                            var den32 = denSet3[basis[i].k, basis[j].j];
+
+                            if (basis == pb3)
+                                ham[i, j] = +1.0 * CircularCoulomb(den11, den22, den33) +
+                                +2.0 * CircularCoulomb(den12, den23, den31).Real +
+                                -1.0 * CircularCoulomb(den11, den23, den32) +
+                                -1.0 * CircularCoulomb(den22, den31, den13) +
+                                -1.0 * CircularCoulomb(den33, den12, den21);
+                            else if (basis == apb3)
+                                ham[i, j] = +1.0 * CircularCoulomb(den11, den22, den33) +
+                                -1.0 * CircularCoulomb(den11, den23, den32);
+
+                            if (i == j)
+                                ham[i, j] += spb1[basis[i].i].energy + spb2[basis[i].j].energy + spb3[basis[i].k].energy;
+
+                            //// Hamiltonians are Hermitian
+                            if (i == j)
+                                ham[i, j] = ham[i, j].Real;
+                            ham[j, i] =
+                                new Complex(
+                                    ham[i, j].Real, -ham[i, j].Imaginary
+                                );
+                        }
+                }
+                
+                p3GSE = new [] {
+                    Eigen.EVD(hamDDD, 1)[0].val, 
+                    Eigen.EVD(hamUDD, 1)[0].val, 
+                    Eigen.EVD(hamDUU, 1)[0].val
+                }.Min();
+            }
+
+            // TODO: Expose CSD information to NnPlan!
+
             ////// Diagonalization
             SetStatus("Diagonalizing Hamiltonians ...");
 
             var apEigen = Eigen.EVD(hamAP, 3);
             var uuEigen = Eigen.EVD(hamUU, 2);
-            var ddEigen = Eigen.EVD(hamDD, 2);
+            var ddEigen = Eigen.EVD(hamDD, 2);            
 
             //// Create Reports (Verbal & NXY data)
             SetStatus("Writing Report ...");
             string verbalReport = "";
 
             ////// Corrected energy
-            
+
             string reportEnergy = "";
             reportEnergy += "no. energy-left-up(eV) energy-left-down(eV) energy-right-up(eV) energy-right-down(eV)\n";
             for (int i = 0; i < order; i++) {
@@ -377,7 +466,14 @@ namespace NnManager {
             double p1GSE = lDWF.Concat(lUWF).Concat(rDWF).Concat(rUWF).Select(x => x.energy).Min();
             double p2GSE = apEigen.Concat(uuEigen).Concat(ddEigen).Select(x => x.val).Min();
 
-            string ensembleGSinfo = $"\nEnsemble GS energy for 0/1/2 particles:\n {p0GSE}, {p1GSE}, {p2GSE}";
+            string ensembleGSinfo;
+            if (p3GSE != null) {
+                ensembleGSinfo = $"\nEnsemble GS energy for 0/1/2/3 particles:\n {p0GSE}, {p1GSE}, {p2GSE}, {p3GSE}";
+                NnDQDJEnergies = new List<double>{p0GSE, p1GSE, p2GSE, p3GSE ?? 0.0};
+            } else {
+                ensembleGSinfo = $"\nEnsemble GS energy for 0/1/2 particles:\n {p0GSE}, {p1GSE}, {p2GSE}";
+                NnDQDJEnergies = new List<double>{p0GSE, p1GSE, p2GSE};
+            }
 
             verbalReport +=
                 uuInfo + "\n" +
