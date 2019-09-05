@@ -303,5 +303,25 @@ namespace NnManager {
 
             File.WriteAllText(FSPath.SubPath("AntiCrossing.txt"), report);
         }
+
+        public void GenerateCSDReport0906() {
+
+            string report = "Vol_L(V),Vol_R(V),CSD\n";
+            var entries = new List<(string volL, string volR, int csd)>();
+            foreach (var nnTask in Tasks) {
+                var param = nnTask.Key;
+                var task = nnTask.Value;
+
+                if (task.NnDQDJCS is int nnDQDJCS)
+                if (param.GetValue("Vol_L") is string volL)
+                if (param.GetValue("Vol_R") is string volR)
+                    entries.Add((volL, volR, nnDQDJCS));
+            }
+
+            foreach ((string volL, string volR, int csd) in entries)
+                report += volL + "," + volR + "," + csd + "\n";
+
+            File.WriteAllText(FSPath.SubPath("CSD.txt"), report);
+        }
     }
 }
