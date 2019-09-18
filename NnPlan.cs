@@ -306,20 +306,36 @@ namespace NnManager {
 
         public void GenerateCSDReport0906() {
 
-            string report = "Vol_L(V),Vol_R(V),CSD\n";
-            var entries = new List<(string volL, string volR, int csd)>();
+            string report = "Vol_L(V),Vol_R(V),Chg_L,Chg_R,L,R\n";
+            var entries = 
+                new List<(string volL, string volR, string chgL, string chgR, string l, string r)>();
+
+            Func<double, string> ChgType = (double chg) => {
+                if (chg < 0.5) return "0";
+                if (chg < 1.5) return "1";
+                if (chg < 2.5) return "2";
+                return "3";
+            };
+
             foreach (var nnTask in Tasks) {
                 var param = nnTask.Key;
                 var task = nnTask.Value;
 
-                if (task.NnDQDJCS is int nnDQDJCS)
+                // if (task.NnDQDJCS is int nnDQDJCS)
+                if (task.NnDQDReportChgs() is (double l, double r) chgs)
                 if (param.GetValue("Vol_L") is string volL)
-                if (param.GetValue("Vol_R") is string volR)
-                    entries.Add((volL, volR, nnDQDJCS));
+                if (param.GetValue("Vol_R") is string volR) {
+                    
+                    entries.Add(
+                        (
+                            volL, volR, 
+                            chgs.l.ToString(), chgs.r.ToString(),
+                            ChgType(chgs.l), ChgType(chgs.r)));
+                }
             }
 
-            foreach ((string volL, string volR, int csd) in entries)
-                report += volL + "," + volR + "," + csd + "\n";
+            foreach ((string volL, string volR, string chgL, string chgR, string l, string r) in entries)
+                report += volL + "," + volR + "," + chgL + "," + chgR + "," + l + "," + r + "\n";
 
             File.WriteAllText(FSPath.SubPath("CSD.txt"), report);
         }

@@ -48,9 +48,21 @@ namespace NnManager {
 
         string NnDQDJGetResult() => File.ReadAllText(NnDQDJResultPath);
 
-        public List<double> NnDQDJEnergies { get; private set; }
+        public List<double> NnDQDJEnergies() {
+            if (!NnDQDJIsDone())
+                return new List<double>();
 
-        public int NnDQDJCS => NnDQDJEnergies.IndexOf(NnDQDJEnergies.Min());
+            string result = NnDQDJGetResult();
+            string[] energies = {};
+            
+            foreach (var line in result.Split('\n'))
+                if (line.Contains("Ensemble"))
+                    energies = line.Substring(line.IndexOf(':')).Splitter(",");
+
+            return energies.Select(s => Double.Parse(s)).ToList();
+        }
+
+        public int NnDQDJCS => NnDQDJEnergies().IndexOf(NnDQDJEnergies().Min());
 
         bool NnDQDJExecute(CancellationToken ct, ImmutableDictionary<string, string> options) {
 
@@ -469,10 +481,10 @@ namespace NnManager {
             string ensembleGSinfo;
             if (p3GSE != null) {
                 ensembleGSinfo = $"\nEnsemble GS energy for 0/1/2/3 particles:\n {p0GSE}, {p1GSE}, {p2GSE}, {p3GSE}";
-                NnDQDJEnergies = new List<double>{p0GSE, p1GSE, p2GSE, p3GSE ?? 0.0};
+                // NnDQDJEnergies = new List<double>{p0GSE, p1GSE, p2GSE, p3GSE ?? 0.0};
             } else {
                 ensembleGSinfo = $"\nEnsemble GS energy for 0/1/2 particles:\n {p0GSE}, {p1GSE}, {p2GSE}";
-                NnDQDJEnergies = new List<double>{p0GSE, p1GSE, p2GSE};
+                // NnDQDJEnergies = new List<double>{p0GSE, p1GSE, p2GSE};
             }
 
             verbalReport +=

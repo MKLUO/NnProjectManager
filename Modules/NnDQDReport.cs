@@ -44,6 +44,20 @@ namespace NnManager {
 
         string NnDQDReportGetResult() => File.ReadAllText(NnDQDReportMiscPath);
 
+        public (double l, double r) NnDQDReportChgs() {
+            if (!NnDQDReportIsDone())
+                return (-1, -1);
+
+            string result = NnDQDReportGetResult();
+            string[] entries = {};
+            
+            foreach (var line in result.Split('\n'))
+                if (line.Contains("("))
+                    entries = line.Substring(1, line.Length - 2).Splitter(",");
+
+            return (Double.Parse(entries[0]), Double.Parse(entries[1]));
+        }
+
         bool NnDQDReportExecute(CancellationToken ct, ImmutableDictionary<string, string> options) {
 
             //==========Clearing old outputs==========

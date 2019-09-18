@@ -15,6 +15,7 @@ namespace NnManager {
     [Serializable]
     public enum ModuleType {
         NnMain,
+        NnMainNonSC,
         // NnOccup,
         NnDQDReport,
         NnDQDJ,
@@ -31,6 +32,8 @@ namespace NnManager {
             NnModule module;
             switch (type) {
                 case ModuleType.NnMain:
+                    module = NnMain(options); break;
+                case ModuleType.NnMainNonSC:
                     module = NnMain(options); break;
                 // case ModuleType.NnOccup:
                 //     module = NnOccup(options); break;
@@ -60,6 +63,8 @@ namespace NnManager {
 
         public static ImmutableDictionary<string, string> GetDefaultOptions(ModuleType type) {
             switch (type) {
+                case ModuleType.NnMainNonSC:
+                    return NnTask.NnMainNonSCDefaultOption;    
                 // case ModuleType.NnOccup:
                 //     return NnTask.NnOccupDefaultOption;
                 // case ModuleType.NnDen2DEG:
