@@ -302,12 +302,13 @@ namespace NnManager {
             }
 
             // NOTE: 3-particle 
+            // FIXME: Should I unify CSD calculation for 2/3/n-particles?
 
             options.TryGetValue("3particle", out string? do3Particle);
             
             double? p3GSE = null;
             if (do3Particle == "yes") {
-                //// 3-particle basis (notation: (spin-up WF, spin-down WF)) (ordering: left-GS, left-1stEX, ... , right-GS, right-1stEX, ...)
+                //// 3-particle basis (notation: (spin-up WF, spin-down WF, spin-down WF)) (ordering: left-GS, left-1stEX, ... , right-GS, right-1stEX, ...)
                 var apb3 = new List < (int i, int j, int k, string name) > ();
                 for (int i = 0; i < order * 2; i++)
                     for (int j = 0; j < order * 2; j++)
@@ -330,6 +331,7 @@ namespace NnManager {
                     ScalarField.Coulomb(y, z, coulomb) +
                     ScalarField.Coulomb(z, x, coulomb);
 
+                // FIXME: Since what we need here is only 3-particle GS energy, can I omit UDD & DUU? (Probably no. It's possible that energies of DDD exceed UDD & DUU.)
                 foreach (var(name, ham, basis, denSet1, denSet2, denSet3, spb1, spb2, spb3) in new [] {
                         // ("UUU", hamUUU, pb3, denUp, denUp, denUp, uWF, uWF, uWF), // NOTE: UUU should never be GS
                         ("DDD", hamDDD, pb3,  denDown, denDown, denDown, dWF, dWF, dWF),
@@ -386,7 +388,7 @@ namespace NnManager {
 
             // TODO: Expose CSD information to NnPlan!
 
-            ////// Diagonalization
+            ////// Diagonalization (of 2-particle Ham.)
             SetStatus("Diagonalizing Hamiltonians ...");
 
             var apEigen = Eigen.EVD(hamAP, 3);

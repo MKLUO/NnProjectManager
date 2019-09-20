@@ -21,7 +21,7 @@ namespace NnManager {
         public NnModule NnMainNonSC(ImmutableDictionary<string, string> options) =>
             new NnModule(
                 "NN Main Non-SC",
-                () => true, 
+                NnMainNonSCCanExecute, 
                 NnMainNonSCIsDone, 
                 NnMainNonSCExecute, 
                 NnMainNonSCGetResult,
@@ -35,11 +35,11 @@ namespace NnManager {
                 { "y0", "-" },
                 { "y1", "-" },
                 { "z0", "-" },
-                { "z1", "-" },
-                { "order", "2" },
-                { "3particle", "no" },
-                { "enableFTDict", "no" }
+                { "z1", "-" }
             }.ToImmutableDictionary(); 
+
+
+        bool NnMainNonSCCanExecute() => NnMainIsDone();
 
         bool NnMainNonSCIsDone() {
             // FIXME: Check report?
@@ -58,27 +58,20 @@ namespace NnManager {
 
         bool NnMainNonSCExecute(CancellationToken ct, ImmutableDictionary<string, string> options) {
 
-            // RPath logFilePath = NnMainPath.SubPath(NnAgent.logFileName);
+            // Extract potential and bound charge from NnMain.
+            var potentialFile = NnAgent.GetCoordAndDat(
+                FSPath, NnAgent.NnPotentialFileEntry());
+
+            var potential = ScalarField.FromNnDatAndCoord(
+                potentialFile.data, potentialFile.coord
+            );
+
+            // Evalute corrected potential.
+
+            // Oridinary NN run (just like NnMain).
+
+            // Checkpoint: As usual, Output WFs to be analyzed by NnDQDReport.
             
-            // var tsLog = Util.StartLogParser<NnMainLog>(logFilePath, ct, SetStatus);
-
-            // NnAgent.RunNnStructure(
-            //     NnMainPath, Content, ct, Type
-            // );
-            // NnAgent.RunNn(
-            //     NnMainPath, Content, ct, Type
-            // );
-
-            // tsLog.Cancel();
-
-            // string? report = NnAgent.GenerateNnReport(
-            //     NnMainPath, ct, Type
-            // );
-
-            // if (report != null)
-            //     File.WriteAllText(NnMainReportPath, report);
-
-            // return !ct.IsCancellationRequested;
             return true;
         }
     }

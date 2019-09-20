@@ -137,6 +137,8 @@ namespace NnManager {
             Down
         }
 
+        public static string NnPotentialFileEntry() => "potential";
+
         public static (string real, string imag) NnAmplFileEntry(BandType band, int id, Spin spin) {
             switch (spin) {
                 case Spin.Down:
