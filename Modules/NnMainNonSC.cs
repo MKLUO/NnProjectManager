@@ -58,21 +58,94 @@ namespace NnManager {
 
         bool NnMainNonSCExecute(CancellationToken ct, ImmutableDictionary<string, string> options) {
 
+            options.TryGetValue("x0", out string? x0s);
+            options.TryGetValue("x1", out string? x1s);
+            options.TryGetValue("y0", out string? y0s);
+            options.TryGetValue("y1", out string? y1s);
+            options.TryGetValue("z0", out string? z0s);
+            options.TryGetValue("z1", out string? z1s);
+
+            double? x0 = x0s != "-" ? Convert.ToDouble(x0s) : (double?) null;
+            double? x1 = x1s != "-" ? Convert.ToDouble(x1s) : (double?) null;
+            double? y0 = y0s != "-" ? Convert.ToDouble(y0s) : (double?) null;
+            double? y1 = y1s != "-" ? Convert.ToDouble(y1s) : (double?) null;
+            double? z0 = z0s != "-" ? Convert.ToDouble(z0s) : (double?) null;
+            double? z1 = z1s != "-" ? Convert.ToDouble(z1s) : (double?) null;
+
             // Extract potential and bound charge from NnMain.
             var potentialFile = NnAgent.GetCoordAndDat(
                 FSPath, NnAgent.NnPotentialFileEntry());
-
             var potential = ScalarField.FromNnDatAndCoord(
-                potentialFile.data, potentialFile.coord
-            );
+                potentialFile.data.Content, potentialFile.coord.Content
+            ); // Unit: eV
+
+            var densityFile = NnAgent.GetCoordAndDat(
+                FSPath, NnAgent.NnDensityFileEntry());
+            var density = ScalarField.FromNnDatAndCoord(
+                densityFile.data.Content, densityFile.coord.Content
+            ); // Unit: 1E18/cm3 = 1E-3/nm3
+            var boundChargeDensity = 0.001 * density.TruncateAndKeep((x0, y0, z0), (x1, y1, z1));
 
             // Evalute corrected potential.
 
+            var boundChargePotential = 
+                ScalarField.CoulombPotential_ByConvolutionWithKernel(
+                    boundChargeDensity,
+                    NnAgent.CoulombKernel(boundChargeDensity)
+                );
+
+            var correctedPotential = potential + boundChargePotential;
+
+            // Copy correceted potential to NonSC folder
+
+            foreach ((RPath src, string extName) in new [] {
+                (potentialFile.coord, ".coord"),
+                (potentialFile.fld,   ".fld"),
+                (potentialFile.v,     ".v")
+            }) File.Copy(src, NnMainNonSCPath.SubPath("potential" + extName), true);
+
+            File.WriteAllLines(
+                NnMainNonSCPath.SubPath("potential.dat"), 
+                ScalarField.ToNnRealFieldDatLines(correctedPotential));
+
             // Oridinary NN run (just like NnMain).
+
+            RPath logFilePath = NnMainNonSCPath.SubPath(NnAgent.logFileName);
+            
+            var tsLog = Util.StartLogParser<NnMainNonSCLog>(logFilePath, ct, SetStatus);
+
+            // NnAgent.RunNnStructure(
+            //     NnMainNonSCPath, Content, ct, Type
+            // );
+            // NnAgent.RunNn(
+            //     NnMainNonSCPath, Content, ct, Type
+            // );
 
             // Checkpoint: As usual, Output WFs to be analyzed by NnDQDReport.
             
             return true;
+        }
+    }
+
+    class NnMainNonSCLog : LogBase {
+        int quantumPossionItCount = 0;
+
+        // FIXME: complete it!
+        public override string? Push(string line) {
+            string match;
+            if ((match = Regex.Match(line, @"(Newton step: \d+)").Value) != "") {
+                int newtonStep = Int32.Parse(
+                    Regex.Split(match, " ")
+                    .Where(s => s != String.Empty).ElementAt(2)
+                );
+                return $"(NonSC) Q.P. #{quantumPossionItCount}, N. #{newtonStep.ToString()}";
+            } else if ((match = Regex.Match(line, @"(QUANTUM-POISSON:  its = \d+)").Value) != "") {
+                quantumPossionItCount = Int32.Parse(
+                    Regex.Split(match, "[ ]+")
+                    .Where(s => s != String.Empty).ElementAt(3)
+                );
+                return null;
+            } else return null;
         }
     }
 }

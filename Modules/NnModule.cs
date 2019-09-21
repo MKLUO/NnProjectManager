@@ -34,7 +34,7 @@ namespace NnManager {
                 case ModuleType.NnMain:
                     module = NnMain(options); break;
                 case ModuleType.NnMainNonSC:
-                    module = NnMain(options); break;
+                    module = NnMainNonSC(options); break;
                 // case ModuleType.NnOccup:
                 //     module = NnOccup(options); break;
                 // case ModuleType.NnDen2DEG:

@@ -265,11 +265,11 @@ namespace NnManager {
 
                         SetStatus($"Evaluating {name}({i},{j}) ...");
 
-                        var den1 = denSet1[basis[i].i, basis[j].i];
-                        var den2 = denSet2[basis[i].j, basis[j].j];
+                        var den1 = denSet1[basis[i].i, basis[j].i]; // xx
+                        var den2 = denSet2[basis[i].j, basis[j].j]; // yy
 
-                        var den3 = denSet1[basis[i].i, basis[j].j];
-                        var den4 = denSet2[basis[i].j, basis[j].i];
+                        var den3 = denSet1[basis[i].i, basis[j].j]; // xy
+                        var den4 = denSet2[basis[i].j, basis[j].i]; // yx
 
                         cHam[i, j] = ScalarField.Coulomb(den1, den2, coulomb, ftDict);
 
