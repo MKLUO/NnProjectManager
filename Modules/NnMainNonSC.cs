@@ -46,6 +46,11 @@ namespace NnManager {
             return true;
         }
 
+        RPath NnMainNonSCToken => FSPath.SubPath("IsNonSC");
+        bool NnMainNonSCIsNonSC() {
+            return File.Exists(NnMainNonSCToken);
+        }
+
         string NnMainNonSCGetResult() {
             try {
                 // FIXME: done (converge) / diverge.
@@ -99,6 +104,7 @@ namespace NnManager {
             // Copy correceted potential to NonSC folder
 
             foreach ((RPath src, string extName) in new [] {
+                // (potentialFile.data,  ".dat"),
                 (potentialFile.coord, ".coord"),
                 (potentialFile.fld,   ".fld"),
                 (potentialFile.v,     ".v")
@@ -110,42 +116,16 @@ namespace NnManager {
 
             // Oridinary NN run (just like NnMain).
 
-            RPath logFilePath = NnMainNonSCPath.SubPath(NnAgent.logFileName);
-            
-            var tsLog = Util.StartLogParser<NnMainNonSCLog>(logFilePath, ct, SetStatus);
-
             // NnAgent.RunNnStructure(
-            //     NnMainNonSCPath, Content, ct, Type
+            //     NnMainPath, ContentNonSC, ct, Type
             // );
-            // NnAgent.RunNn(
-            //     NnMainNonSCPath, Content, ct, Type
-            // );
+            NnAgent.RunNn(
+                NnMainPath, ContentNonSC, ct, Type
+            );
 
-            // Checkpoint: As usual, Output WFs to be analyzed by NnDQDReport.
-            
-            return true;
-        }
-    }
+            File.Create(NnMainNonSCToken);
 
-    class NnMainNonSCLog : LogBase {
-        int quantumPossionItCount = 0;
-
-        // FIXME: complete it!
-        public override string? Push(string line) {
-            string match;
-            if ((match = Regex.Match(line, @"(Newton step: \d+)").Value) != "") {
-                int newtonStep = Int32.Parse(
-                    Regex.Split(match, " ")
-                    .Where(s => s != String.Empty).ElementAt(2)
-                );
-                return $"(NonSC) Q.P. #{quantumPossionItCount}, N. #{newtonStep.ToString()}";
-            } else if ((match = Regex.Match(line, @"(QUANTUM-POISSON:  its = \d+)").Value) != "") {
-                quantumPossionItCount = Int32.Parse(
-                    Regex.Split(match, "[ ]+")
-                    .Where(s => s != String.Empty).ElementAt(3)
-                );
-                return null;
-            } else return null;
+            return !ct.IsCancellationRequested;;
         }
     }
 }

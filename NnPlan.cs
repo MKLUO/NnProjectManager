@@ -152,6 +152,7 @@ namespace NnManager {
                             Template.Type,
                             FSPath.SubPath("tasks").SubPath(tag),
                             Template.GenerateContent(param.Variables),
+                            Template.GenerateContent(param.Variables, true),
                             Template.GenerateModuleOptions(param.Variables)
                         );
 

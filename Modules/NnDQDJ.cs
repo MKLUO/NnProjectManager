@@ -53,8 +53,8 @@ namespace NnManager {
                 return new List<double>();
 
             string result = NnDQDJGetResult();
-            string[] energies = {};
-            
+            string[] energies = { };
+
             foreach (var line in result.Split('\n'))
                 if (line.Contains("Ensemble"))
                     energies = line.Substring(line.IndexOf(':')).Splitter(",");
@@ -82,7 +82,7 @@ namespace NnManager {
             options.TryGetValue("order", out string? orders);
             int order = orders != "-" ? Convert.ToUInt16(orders) : 2;
 
-            //// Read in spectrum & info (from DQD Report) ////
+            //// NOTE: Read in spectrum & info (from DQD Report) ////
             SetStatus("Reading spectrum ...");
             if (NnDQDReportEnergyPath?.Content == null)
                 return false;
@@ -120,7 +120,7 @@ namespace NnManager {
                     ));
             }
 
-            //// Read in WF files ( # = order'
+            //// NOTE: Read in WF files ( # = order'
 
             if (order < 1)
                 return false;
@@ -166,12 +166,12 @@ namespace NnManager {
                 }
             }
 
-            ////// Calculate Coulomb Kernel
+            ////// NOTE: Calculate Coulomb Kernel
             var coulomb = NnAgent.CoulombKernel(lDWF[0].wf);
 
-            //// Substrate out extra Hartree energy included in NN mean-field calculation
+            //// NOTE: Substrate out extra Hartree energy included in NN mean-field calculation
 
-            // Construct Fermi-dirac calculated bound charge density
+            // NOTE: Construct Fermi-dirac calculated bound charge density
 
             ScalarField? boundChargeDensity = null;
             foreach (var(occup, wf) in allWFwithOccup) {
@@ -181,26 +181,28 @@ namespace NnManager {
                 else
                     boundChargeDensity += norm;
             }
-            foreach (var wfCollection in new [] {
-                    lDWF,
-                    lUWF,
-                    rDWF,
-                    rUWF
-                })
-                for (int i = 0; i < order; i++) {
-                    wfCollection[i] = (
-                        wfCollection[i].energy -
-                        ScalarField.Coulomb(
-                            boundChargeDensity,
-                            wfCollection[i].wf * wfCollection[i].wf.Conj(),
-                            coulomb).Real,
-                        wfCollection[i].wf
-                    );
-                }
 
-            //// Assemble WFs into pseudo densities (direct product) (den[i, j] = n(r) = <j| * |i>)
+            if (!NnMainNonSCIsNonSC())
+                foreach (var wfCollection in new [] {
+                        lDWF,
+                        lUWF,
+                        rDWF,
+                        rUWF
+                    })
+                    for (int i = 0; i < order; i++) {
+                        wfCollection[i] = (
+                            wfCollection[i].energy -
+                            ScalarField.Coulomb(
+                                boundChargeDensity,
+                                wfCollection[i].wf * wfCollection[i].wf.Conj(),
+                                coulomb).Real,
+                            wfCollection[i].wf
+                        );
+                    }
+
+            //// NOTE: Assemble WFs into pseudo densities (direct product) (den[i, j] = n(r) = <j| * |i>)
             /*
-                Since the spin basis chosen here is spin-z eigenbasis, 
+                NOTE: Since the spin basis chosen here is spin-z eigenbasis, 
                 coulomb repulsion of parallel (P) and antiparallel (AP) spin states are decoupled (selection rule), and can be calculated separately.
             */
             SetStatus("Assembling WF ...");
@@ -239,7 +241,7 @@ namespace NnManager {
                 for (int j = i + 1; j < order * 2; j++)
                     pb.Add((i, j, $""));
 
-            //// Evaluate Hamiltonians & diagonalize
+            //// NOTE: Evaluate Hamiltonians & diagonalize
             ////// energy = bound state energy + coulomb repulsion
 
             var hamAP = new Complex[apb.Count(), apb.Count()];
@@ -273,7 +275,7 @@ namespace NnManager {
 
                         cHam[i, j] = ScalarField.Coulomb(den1, den2, coulomb, ftDict);
 
-                        //// In parallel spin states, conjugate term of orbital WF also contributes to ham.
+                        //// NOTE: In parallel spin states, conjugate term of orbital WF also contributes to ham.
                         if (selCoef != 0.0)
                             cHam[i, j] += selCoef * ScalarField.Coulomb(den3, den4, coulomb, ftDict);
 
@@ -305,10 +307,10 @@ namespace NnManager {
             // FIXME: Should I unify CSD calculation for 2/3/n-particles?
 
             options.TryGetValue("3particle", out string? do3Particle);
-            
+
             double? p3GSE = null;
             if (do3Particle == "yes") {
-                //// 3-particle basis (notation: (spin-up WF, spin-down WF, spin-down WF)) (ordering: left-GS, left-1stEX, ... , right-GS, right-1stEX, ...)
+                //// NOTE: 3-particle basis (notation: (spin-up WF, spin-down WF, spin-down WF)) (ordering: left-GS, left-1stEX, ... , right-GS, right-1stEX, ...)
                 var apb3 = new List < (int i, int j, int k, string name) > ();
                 for (int i = 0; i < order * 2; i++)
                     for (int j = 0; j < order * 2; j++)
@@ -334,11 +336,10 @@ namespace NnManager {
                 // FIXME: Since what we need here is only 3-particle GS energy, can I omit UDD & DUU? (Probably no. It's possible that energies of DDD exceed UDD & DUU.)
                 foreach (var(name, ham, basis, denSet1, denSet2, denSet3, spb1, spb2, spb3) in new [] {
                         // ("UUU", hamUUU, pb3, denUp, denUp, denUp, uWF, uWF, uWF), // NOTE: UUU should never be GS
-                        ("DDD", hamDDD, pb3,  denDown, denDown, denDown, dWF, dWF, dWF),
-                        ("UDD", hamUDD, apb3, denUp,   denDown, denDown, uWF, dWF, dWF),
-                        ("DUU", hamDUU, apb3, denDown, denUp,   denUp,   dWF, uWF, uWF),
-                    }) 
-                {
+                        ("DDD", hamDDD, pb3, denDown, denDown, denDown, dWF, dWF, dWF),
+                        ("UDD", hamUDD, apb3, denUp, denDown, denDown, uWF, dWF, dWF),
+                        ("DUU", hamDUU, apb3, denDown, denUp, denUp, dWF, uWF, uWF),
+                    }) {
                     for (int i = 0; i < basis.Count(); i++)
                         for (int j = i; j < basis.Count(); j++) {
 
@@ -378,28 +379,26 @@ namespace NnManager {
                                 );
                         }
                 }
-                
+
                 p3GSE = new [] {
-                    Eigen.EVD(hamDDD, 1)[0].val, 
-                    Eigen.EVD(hamUDD, 1)[0].val, 
-                    Eigen.EVD(hamDUU, 1)[0].val
+                    Eigen.EVD(hamDDD, 1) [0].val,
+                        Eigen.EVD(hamUDD, 1) [0].val,
+                        Eigen.EVD(hamDUU, 1) [0].val
                 }.Min();
             }
 
-            // TODO: Expose CSD information to NnPlan!
-
-            ////// Diagonalization (of 2-particle Ham.)
+            ////// NOTE: Diagonalization (of 2-particle Ham.)
             SetStatus("Diagonalizing Hamiltonians ...");
 
             var apEigen = Eigen.EVD(hamAP, 3);
             var uuEigen = Eigen.EVD(hamUU, 2);
-            var ddEigen = Eigen.EVD(hamDD, 2);            
+            var ddEigen = Eigen.EVD(hamDD, 2);
 
-            //// Create Reports (Verbal & NXY data)
+            //// NOTE: Create Reports (Verbal & NXY data)
             SetStatus("Writing Report ...");
             string verbalReport = "";
 
-            ////// Corrected energy
+            ////// NOTE: Corrected energy
 
             string reportEnergy = "";
             reportEnergy += "no. energy-left-up(eV) energy-left-down(eV) energy-right-up(eV) energy-right-down(eV)\n";
@@ -408,11 +407,11 @@ namespace NnManager {
             }
             File.WriteAllText(NnDQDJCorrectedEnergyPath, reportEnergy);
 
-            ////// J
+            ////// NOTE: J
             var J = apEigen[0].val + apEigen[1].val - uuEigen[0].val - ddEigen[0].val;
             verbalReport += $"J = {J.ToString("E04")} (eV), order = {order}\n";
 
-            ////// Pickup eigenstates (candidates), label them by their leading components.
+            ////// NOTE: Pickup eigenstates (candidates), label them by their leading components.
             string BasisIdxToTag(int idx) {
                 if (idx >= order) return $"R{idx - order}";
                 else return $"L{idx}";
@@ -467,13 +466,13 @@ namespace NnManager {
                 }
             }
 
-            /// Pick up lowest 3 energy in AP
+            /// NOTE: Pick up lowest 3 energy in AP
             /// 
 
             double pGS = (uuEigen[0].val + ddEigen[0].val) * 0.5;
             string apGSinfo = $"\nLowest 3 energy in AP:\n {apEigen[0].val - pGS}, {apEigen[1].val - pGS}, {apEigen[2].val - pGS}";
 
-            /// Pick up ensemble GS for each particle num
+            /// NOTE: Pick up ensemble GS for each particle num
             /// 
 
             double p0GSE = 0.0;
