@@ -298,7 +298,8 @@ namespace NnManager {
         }
       
         public string GenerateContent(
-            ImmutableDictionary<string, string> param) {
+            ImmutableDictionary<string, string> param,
+            bool nonSC = false) {
 
             // FIXME: WET!
             string tokenVariable = "\\$";
@@ -311,11 +312,20 @@ namespace NnManager {
                 break;
             }
 
+            // NOTE: Reserved Meta-Parameters (e.g., Non-SC)
+            var paramWithMeta = new Dictionary<string, string>(param);
+            paramWithMeta["NnMainNonSC_ON"] = "#";
+            paramWithMeta["NnMainNonSC_OFF"] = "";
+            if (nonSC) {
+                paramWithMeta["NnMainNonSC_ON"] = "";
+                paramWithMeta["NnMainNonSC_OFF"] = "#";
+            }
+
             string result = "";
 
             foreach (Element element in Elements) {
                 if (element.IsVariable()) {
-                    result += Evaluate(tokenVariable.Last() + element.Name, param);
+                    result += Evaluate(tokenVariable.Last() + element.Name, paramWithMeta.ToImmutableDictionary());
                 } else {
                     result += element.Name;
                 }

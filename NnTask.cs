@@ -22,6 +22,8 @@ namespace NnManager {
         public NnType Type { get; }
         public RPath FSPath { get; }
         public string Content { get; }
+        public string ContentNonSC { get; }
+
 
         public ModuleOptionDict BuiltInModuleOptions { get; }
 
@@ -65,14 +67,17 @@ namespace NnManager {
             NnType type,
             RPath path,
             string content,
+            // TODO: Is it a good idea to put NonSC here?
+            string contentNonSC,
             ModuleOptionDict dict
-        ) : this(name, type, path, content, dict, new List<NnModuleRecord>(), new List<NnModuleRecord>()) {}
+        ) : this(name, type, path, content, contentNonSC, dict, new List<NnModuleRecord>(), new List<NnModuleRecord>()) {}
 
         NnTask(
             string name,
             NnType type,
             RPath path,
             string content,
+            string contentNonSC,
             ModuleOptionDict dict,
             List<NnModuleRecord> moduleDone,
             List<NnModuleRecord> moduleQueue
@@ -81,6 +86,7 @@ namespace NnManager {
             this.Type = type;
             this.FSPath = path;
             this.Content = content;
+            this.ContentNonSC = contentNonSC;
             this.BuiltInModuleOptions = dict;
             this.currentModule = null;
             this.moduleDone = moduleDone;
@@ -95,6 +101,7 @@ namespace NnManager {
                 name = task.Name;
                 type = task.Type;
                 content = task.Content;
+                contentNonSC = task.ContentNonSC;
                 moduleOptions = task.BuiltInModuleOptions;
                 modulesDone = task.moduleDone;
                 moduleQueue = task.moduleQueue.ToList();
@@ -102,6 +109,7 @@ namespace NnManager {
             readonly public string name;
             readonly public NnType type;
             readonly public string content;
+            readonly public string contentNonSC;
             readonly public ModuleOptionDict moduleOptions;
             readonly public List<NnModuleRecord> modulesDone;
             readonly public List<NnModuleRecord> moduleQueue;
@@ -126,6 +134,7 @@ namespace NnManager {
                     taskData.type, 
                     path, 
                     taskData.content,
+                    taskData.contentNonSC,
                     taskData.moduleOptions,
                     taskData.modulesDone, 
                     taskData.moduleQueue);                

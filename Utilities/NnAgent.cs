@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using System.Text.RegularExpressions;
 using System.Threading;
 
@@ -9,6 +10,7 @@ using System.Threading;
 
 namespace NnManager {
     using RPath = Util.RestrictedPath;
+    using Dim = ScalarField.Dim;
 
     public static class NnAgent {
         // TODO: Check for NN exe 
@@ -96,7 +98,7 @@ namespace NnManager {
             }
         }
 
-        public static string? GenerateNnReport(RPath path, CancellationToken ct, NnType type) {
+        public static string? GenerateNnReport(RPath path, CancellationToken _, NnType type) {
             try {
                 string exePath = "";
                 switch (type) {
@@ -134,6 +136,10 @@ namespace NnManager {
             Up,
             Down
         }
+
+        public static string NnPotentialFileEntry() => "potential";
+
+        public static string NnDensityFileEntry() => "density_electron";
 
         public static (string real, string imag) NnAmplFileEntry(BandType band, int id, Spin spin) {
             switch (spin) {
@@ -173,23 +179,6 @@ namespace NnManager {
             return (data, coord, fld, v);
         }
 
-        // public static Dictionary<int, double>? ReadNXY(string content, int ny)
-        // {
-        //     string[] dataLines =
-        //         content.Splitter("[\r\n|\r|\n]+");
-
-        //     int n = dataLines[0].Splitter("([ |\t]+)").Length;
-        //     if (ny >= n) return null;
-
-        //     var result = new Dictionary<int, double>();
-        //     foreach (int i in Enumerable.Range(1, dataLines.Count() - 1)) {
-        //         var data = dataLines[i].Splitter("[ |\t]+");
-        //         result[int.Parse(data[0])] = Double.Parse(data[ny + 1], System.Globalization.NumberStyles.Float);
-        //     }
-
-        //     return result;
-        // }
-
         public static List<(string, string)>? ReadNXY(string content, int ny)
         {
             string[] dataLines =
@@ -207,6 +196,48 @@ namespace NnManager {
             }
 
             return result;
+        }
+
+        public static Dictionary<int, double>? ReadNXYIntDouble(string content, int ny)
+        {
+            var nxy = NnAgent.ReadNXY(content, ny) ?? 
+                throw new Exception();
+            if (nxy == null) return null;
+
+            var result = new Dictionary<int, double>();
+
+            foreach (var (id, value) in nxy)
+                result[int.Parse(id)] = Double.Parse(value);
+            
+            return result;
+        }
+
+        public static Complex[,,] CoulombKernel(ScalarField refWf) {
+            var refer = refWf;
+            int dimX = refer.Coords[Dim.X].Count;
+            int dimY = refer.Coords[Dim.Y].Count;
+            int dimZ = refer.Coords[Dim.Z].Count;
+            var xC = refer.Coords[Dim.X].Count / 2;
+            var yC = refer.Coords[Dim.Y].Count / 2;
+            var zC = refer.Coords[Dim.Z].Count / 2;
+            double gX = refer.Coords[Dim.X][xC] - refer.Coords[Dim.X][xC-1];
+            double gY = refer.Coords[Dim.Y][yC] - refer.Coords[Dim.Y][yC-1];
+            double gZ = refer.Coords[Dim.Z][zC] - refer.Coords[Dim.Z][zC-1];
+            var coulomb = new Complex[
+                dimX * 2 + 1,
+                dimY * 2 + 1,
+                dimZ * 2 + 1
+            ];
+            foreach (var x in Enumerable.Range(0, dimX * 2 + 1))
+            foreach (var y in Enumerable.Range(0, dimY * 2 + 1))
+            foreach (var z in Enumerable.Range(0, dimZ * 2 + 1))
+                coulomb[x, y, z] = 
+                    1.0 / Math.Sqrt(
+                        Math.Pow((x - dimX - 0.5)*gX, 2) + 
+                        Math.Pow((y - dimY - 0.5)*gY, 2) + 
+                        Math.Pow((z - dimZ - 0.5)*gZ, 2));
+            
+            return coulomb;
         }
     }
 }

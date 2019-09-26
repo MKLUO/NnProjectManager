@@ -66,6 +66,9 @@ namespace NnManager {
             if (report != null)
                 File.WriteAllText(NnMainReportPath, report);
 
+            // if (File.Exists(NnMainNonSCToken))
+            //     File.Delete(NnMainNonSCToken);
+
             return !ct.IsCancellationRequested;
         }
     }

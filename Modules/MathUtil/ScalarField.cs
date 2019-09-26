@@ -145,7 +145,14 @@ namespace NnManager {
                 ));
         }
 
-        
+        public static IEnumerable<string> ToNnRealFieldDatLines(
+            ScalarField data
+        ) {
+            foreach (var z in Enumerable.Range(0, data.Coords[Dim.Z].Count))
+            foreach (var y in Enumerable.Range(0, data.Coords[Dim.Y].Count))
+            foreach (var x in Enumerable.Range(0, data.Coords[Dim.X].Count))
+                yield return data.Data[x, y, z].Real.ToString();
+        }
 
         bool IsWithinRange(double? x0, double? x1, double x) {
             if ((x0 == null) || (x1 == null)) return true;
@@ -174,6 +181,19 @@ namespace NnManager {
                 x1 ?? throw new Exception(), 
                 x2 ?? throw new Exception()
             );
+        }
+
+        ((int x, int y, int z) idx0, (int x, int y, int z) idx1) 
+        RangeToIdxRange(
+            (double? x, double? y, double? z) range0, 
+            (double? x, double? y, double? z) range1) {
+            (int x, int y, int z) idx0, idx1;          
+
+            (idx0.x, idx1.x) = GrabRange(Coords[Dim.X], range0.x, range1.x);
+            (idx0.y, idx1.y) = GrabRange(Coords[Dim.Y], range0.y, range1.y);
+            (idx0.z, idx1.z) = GrabRange(Coords[Dim.Z], range0.z, range1.z);
+
+            return (idx0, idx1);
         }
 
         static double D(int x, ImmutableList<double> data) {
@@ -253,6 +273,20 @@ namespace NnManager {
             return result;
         }
 
+        public static Complex[,,] MultiplyInplace(Complex[,,] field, double value) {
+            var dimX = field.GetLength(0);
+            var dimY = field.GetLength(1);
+            var dimZ = field.GetLength(2);
+
+            // var result = new Complex[dimX, dimY, dimZ];
+            foreach (var x in Enumerable.Range(0, dimX))
+            foreach (var y in Enumerable.Range(0, dimY))
+            foreach (var z in Enumerable.Range(0, dimZ))
+                field[x, y, z] = field[x, y, z] * value;
+
+            return field;
+        }
+
         public ScalarField Conj() {
             Complex[,,] array = new Complex[
                 Coords[Dim.X].Count,
@@ -272,12 +306,7 @@ namespace NnManager {
             (double? x, double? y, double? z) range0, 
             (double? x, double? y, double? z) range1
         ) { 
-            (int x, int y, int z) idx0, idx1;          
-
-            (idx0.x, idx1.x) = GrabRange(Coords[Dim.X], range0.x, range1.x);
-            (idx0.y, idx1.y) = GrabRange(Coords[Dim.Y], range0.y, range1.y);
-            (idx0.z, idx1.z) = GrabRange(Coords[Dim.Z], range0.z, range1.z);
-
+            var (idx0, idx1) = RangeToIdxRange(range0, range1);
             return Truncate(idx0, idx1);
         }
 
@@ -312,15 +341,34 @@ namespace NnManager {
             );
         }
 
+        public ScalarField TruncateAndKeep(
+            (double? x, double? y, double? z) range0, 
+            (double? x, double? y, double? z) range1
+        ) {
+            var (idx0, idx1) = RangeToIdxRange(range0, range1);
+            
+            var newArray = new Complex[
+                Coords[Dim.X].Count,
+                Coords[Dim.Y].Count,
+                Coords[Dim.Z].Count
+            ];
+
+            foreach (var x in Enumerable.Range(idx0.x, idx1.x - idx0.x))
+            foreach (var y in Enumerable.Range(idx0.y, idx1.y - idx0.y))
+            foreach (var z in Enumerable.Range(idx0.z, idx1.z - idx0.z))
+                newArray[x, y, z] = Data[x, y, z];
+
+            return new ScalarField(
+                newArray, 
+                Coords
+            );
+        }
+
         public Complex IntegrateInRange(
             (double? x, double? y, double? z) range0, 
             (double? x, double? y, double? z) range1
         ) {
-            (int x, int y, int z) idx0, idx1;          
-
-            (idx0.x, idx1.x) = GrabRange(Coords[Dim.X], range0.x, range1.x);
-            (idx0.y, idx1.y) = GrabRange(Coords[Dim.Y], range0.y, range1.y);
-            (idx0.z, idx1.z) = GrabRange(Coords[Dim.Z], range0.z, range1.z);    
+            var (idx0, idx1) = RangeToIdxRange(range0, range1); 
 
             Complex result = new Complex(0.0, 0.0);
             foreach (var x in Enumerable.Range(idx0.x, idx1.x - idx0.x))
@@ -414,15 +462,12 @@ namespace NnManager {
         
         // FIXME: VERY DIRTY Coulomb calculation here!
 
-        public static Complex Coulomb(
-                ScalarField f1, 
-                ScalarField f2, 
-                Complex[,,]? coulomb = null, 
-                Dictionary<Complex[,,], Complex[,,]>? ftDict = null) {
-
-            int dimX = Math.Max(f1.Coords[Dim.X].Count, f2.Coords[Dim.X].Count);
-            int dimY = Math.Max(f1.Coords[Dim.Y].Count, f2.Coords[Dim.Y].Count);
-            int dimZ = Math.Max(f1.Coords[Dim.Z].Count, f2.Coords[Dim.Z].Count);
+        public static ScalarField CoulombPotential_ByConvolutionWithKernel(
+            ScalarField f1, Complex[,,]? coulomb = null) {
+            
+            int dimX = f1.Coords[Dim.X].Count;
+            int dimY = f1.Coords[Dim.Y].Count;
+            int dimZ = f1.Coords[Dim.Z].Count;
 
             var xC = f1.Coords[Dim.X].Count / 2;
             var yC = f1.Coords[Dim.Y].Count / 2;
@@ -430,6 +475,62 @@ namespace NnManager {
             double gX = f1.Coords[Dim.X][xC] - f1.Coords[Dim.X][xC-1];
             double gY = f1.Coords[Dim.Y][yC] - f1.Coords[Dim.Y][yC-1];
             double gZ = f1.Coords[Dim.Z][zC] - f1.Coords[Dim.Z][zC-1];
+
+            /***
+                To evaluate coulomb integral between 2 scalar field, here I resampled f2 
+                onto half-grids to avoid singular point (delta r = 0) in coulomb kernel.
+             */
+
+            var coulombSplit = new Complex[
+                dimX * 2 + 1,
+                dimY * 2 + 1,
+                dimZ * 2 + 1
+            ];
+
+            if (coulomb == null) {
+                foreach (var x in Enumerable.Range(0, dimX * 2 + 1))
+                foreach (var y in Enumerable.Range(0, dimY * 2 + 1))
+                foreach (var z in Enumerable.Range(0, dimZ * 2 + 1))
+                    coulombSplit[x, y, z] = 
+                        1.0 / Math.Sqrt(
+                            Math.Pow((x - dimX - 0.5)*gX, 2) + 
+                            Math.Pow((y - dimY - 0.5)*gY, 2) + 
+                            Math.Pow((z - dimZ - 0.5)*gZ, 2));
+            } else coulombSplit = coulomb;
+
+            Complex[,,] f1Split = new Complex[
+                dimX + 1,
+                dimY + 1,
+                dimZ + 1
+            ];
+
+            foreach (var x in Enumerable.Range(0, dimX))
+            foreach (var y in Enumerable.Range(0, dimY))
+            foreach (var z in Enumerable.Range(0, dimZ))
+            foreach (var dx in new []{0, 1})
+            foreach (var dy in new []{0, 1})
+            foreach (var dz in new []{0, 1})
+                f1Split[x + dx, y + dy, z + dz] += f1.Data[x, y, z] * 0.125;
+
+            var conv = ConvolutionSym(
+                coulombSplit, 
+                f1Split
+            );
+
+            return new ScalarField(
+                MultiplyInplace(
+                    conv, 
+                    CoulombConstant() * (gX * gY * gZ)),
+                f1.Coords
+            );
+        }
+
+        public static Complex Coulomb(
+                ScalarField f1, 
+                ScalarField f2, 
+                Complex[,,]? coulomb = null, 
+                Dictionary<Complex[,,], Complex[,,]>? ftDict = null) {
+
             
             #region oldCoulomb
             // // Prepare Coulomb field
@@ -470,56 +571,9 @@ namespace NnManager {
             // );
             #endregion
 
-
-            /***
-                To evaluate coulomb integral between 2 scalar field, here I resampled f2 
-                onto half-grids to avoid singular point (delta r = 0) in coulomb kernel.
-             */
-
-            var coulombSplit = new Complex[
-                dimX * 2 + 1,
-                dimY * 2 + 1,
-                dimZ * 2 + 1
-            ];
-
-            if (coulomb == null) {
-                foreach (var x in Enumerable.Range(0, dimX * 2 + 1))
-                foreach (var y in Enumerable.Range(0, dimY * 2 + 1))
-                foreach (var z in Enumerable.Range(0, dimZ * 2 + 1))
-                    coulombSplit[x, y, z] = 
-                        1.0 / Math.Sqrt(
-                            Math.Pow((x - dimX - 0.5)*gX, 2) + 
-                            Math.Pow((y - dimY - 0.5)*gY, 2) + 
-                            Math.Pow((z - dimZ - 0.5)*gZ, 2));
-            } else coulombSplit = coulomb;
-
-            Complex[,,] f2Split = new Complex[
-                dimX + 1,
-                dimY + 1,
-                dimZ + 1
-            ];
-
-            foreach (var x in Enumerable.Range(0, dimX))
-            foreach (var y in Enumerable.Range(0, dimY))
-            foreach (var z in Enumerable.Range(0, dimZ))
-            foreach (var dx in new []{0, 1})
-            foreach (var dy in new []{0, 1})
-            foreach (var dz in new []{0, 1})
-                f2Split[x + dx, y + dy, z + dz] += f2.Data[x, y, z] * 0.125;
-
-            var conv = ConvolutionSym(
-                coulombSplit, 
-                f2Split,
-                ftDict
-            );
-
-            // Complex result = 0.0;
-            // foreach (var x in Enumerable.Range(0, dimX))
-            // foreach (var y in Enumerable.Range(0, dimY))
-            // foreach (var z in Enumerable.Range(0, dimZ))
-            //     result += conv[x, y, z] * f1.Data[x, y, z];
-
-            return InnerProduct(f1.Data, conv) * gX * gY * gZ * gX * gY * gZ * CoulombConstant();
+            return InnerProduct(
+                f1.Data, 
+                CoulombPotential_ByConvolutionWithKernel(f2, coulomb).Data);
         }
         
 
@@ -644,6 +698,28 @@ namespace NnManager {
             return result;
         }
 
+        static Complex[,,] ReverseInplace(Complex[,,] input) {
+            int dimX = input.GetLength(0);
+            int dimY = input.GetLength(1);
+            int dimZ = input.GetLength(2);
+            // var result = new Complex[dimX, dimY, dimZ];
+            foreach (var x in Enumerable.Range(0, dimX))
+            foreach (var y in Enumerable.Range(0, dimY))
+            foreach (var z in Enumerable.Range(0, (dimZ - dimZ % 2) / 2 + 1)) {
+                var tmp = input[x, y, z];
+                input[x, y, z] = input[
+                    dimX - x - 1, 
+                    dimY - y - 1, 
+                    dimZ - z - 1];
+                input[
+                    dimX - x - 1, 
+                    dimY - y - 1, 
+                    dimZ - z - 1] = tmp;
+            }
+
+            return input;
+        }
+
         
         public static Complex[,,] ConvolutionSym(
             Complex[,,] target, 
@@ -678,8 +754,7 @@ namespace NnManager {
 
             //// IFFT
             var convINV = IFFT(convFT);
-            var conv = Reverse(convINV);
-
+            var conv = ReverseInplace(convINV);
 
             return Truncate(conv, 
                 (
@@ -795,7 +870,7 @@ namespace NnManager {
             pinnedOutput.Dispose();
             
             // return Multiply(output, 1.0 / Math.Sqrt(dimX * dimY * dimZ));
-            return Multiply(output, 1.0 / (dimX * dimY * dimZ));
+            return MultiplyInplace(output, 1.0 / (dimX * dimY * dimZ));
         }
     } 
 }
