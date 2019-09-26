@@ -108,10 +108,10 @@ namespace NnManager {
                 (potentialFile.coord, ".coord"),
                 (potentialFile.fld,   ".fld"),
                 (potentialFile.v,     ".v")
-            }) File.Copy(src, NnMainNonSCPath.SubPath("potentialNonSC" + extName), true);
+            }) File.Copy(src, NnMainNonSCPath.SubPath("potential" + extName), true);
 
             File.WriteAllLines(
-                NnMainNonSCPath.SubPath("potentialNonSC.dat"), 
+                NnMainNonSCPath.SubPath("potential.dat"), 
                 ScalarField.ToNnRealFieldDatLines(correctedPotential));
 
             // Oridinary NN run (just like NnMain).
