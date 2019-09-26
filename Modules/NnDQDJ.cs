@@ -182,7 +182,7 @@ namespace NnManager {
                     boundChargeDensity += norm;
             }
 
-            if (!NnMainNonSCIsNonSC())
+            if (!NnMainIsNonSC())
                 foreach (var wfCollection in new [] {
                         lDWF,
                         lUWF,

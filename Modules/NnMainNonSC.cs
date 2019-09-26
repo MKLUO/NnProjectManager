@@ -47,7 +47,7 @@ namespace NnManager {
         }
 
         RPath NnMainNonSCToken => FSPath.SubPath("IsNonSC");
-        bool NnMainNonSCIsNonSC() {
+        bool NnMainIsNonSC() {
             return File.Exists(NnMainNonSCToken);
         }
 
@@ -108,10 +108,10 @@ namespace NnManager {
                 (potentialFile.coord, ".coord"),
                 (potentialFile.fld,   ".fld"),
                 (potentialFile.v,     ".v")
-            }) File.Copy(src, NnMainNonSCPath.SubPath("potential" + extName), true);
+            }) File.Copy(src, NnMainNonSCPath.SubPath("potentialNonSC" + extName), true);
 
             File.WriteAllLines(
-                NnMainNonSCPath.SubPath("potential.dat"), 
+                NnMainNonSCPath.SubPath("potentialNonSC.dat"), 
                 ScalarField.ToNnRealFieldDatLines(correctedPotential));
 
             // Oridinary NN run (just like NnMain).
@@ -120,10 +120,10 @@ namespace NnManager {
             //     NnMainPath, ContentNonSC, ct, Type
             // );
             NnAgent.RunNn(
-                NnMainPath, ContentNonSC, ct, Type
+                NnMainNonSCPath, ContentNonSC, ct, Type
             );
 
-            File.Create(NnMainNonSCToken);
+            // File.Create(NnMainNonSCToken);
 
             return !ct.IsCancellationRequested;;
         }
