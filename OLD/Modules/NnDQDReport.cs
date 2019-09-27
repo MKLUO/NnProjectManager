@@ -65,7 +65,7 @@ namespace NnManager {
             RPath? NNPath;
             if (non_SC == "yes") {
                 NNPath = NnMainNonSCPath;
-                File.Create(NnMainNonSCToken);
+                File.Create(NnMainNonSCToken).Close();
             } else {
                 NNPath = FSPath;
                 if (File.Exists(NnMainNonSCToken))

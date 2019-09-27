@@ -134,6 +134,8 @@ namespace NnManager {
 
             var allWFwithOccup = new List < (double occup, ScalarField wf) > ();
 
+            var NNPath = NnMainIsNonSC() ? NnMainNonSCPath : NnMainPath;
+
             for (int i = 0; i < order; i++) {
                 foreach ((var wfCollection, var spec, var spin) in new [] {
                         (lDWF, specLD, NnAgent.Spin.Down),
@@ -142,8 +144,8 @@ namespace NnManager {
                         (rUWF, specRU, NnAgent.Spin.Up)
                     }) {
                     var wfs = NnAgent.NnAmplFileEntry(NnAgent.BandType.X1, spec[i].Id, spin);
-                    (var wfImagData, var wfImagCoord, _, _) = NnAgent.GetCoordAndDat(FSPath, wfs.imag);
-                    (var wfRealData, var wfRealCoord, _, _) = NnAgent.GetCoordAndDat(FSPath, wfs.real);
+                    (var wfImagData, var wfImagCoord, _, _) = NnAgent.GetCoordAndDat(NNPath, wfs.imag);
+                    (var wfRealData, var wfRealCoord, _, _) = NnAgent.GetCoordAndDat(NNPath, wfs.real);
                     if ((wfImagData?.Content == null) || (wfImagCoord?.Content == null) ||
                         (wfRealData?.Content == null) || (wfRealCoord?.Content == null))
                         break;

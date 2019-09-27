@@ -463,7 +463,8 @@ namespace NnManager {
         // FIXME: VERY DIRTY Coulomb calculation here!
 
         public static ScalarField CoulombPotential_ByConvolutionWithKernel(
-            ScalarField f1, Complex[,,]? coulomb = null) {
+            // ScalarField f1, Complex[,,]? coulomb = null) {
+            ScalarField f1, Complex[,,] coulomb) {
             
             int dimX = f1.Coords[Dim.X].Count;
             int dimY = f1.Coords[Dim.Y].Count;
@@ -487,16 +488,17 @@ namespace NnManager {
                 dimZ * 2 + 1
             ];
 
-            if (coulomb == null) {
-                foreach (var x in Enumerable.Range(0, dimX * 2 + 1))
-                foreach (var y in Enumerable.Range(0, dimY * 2 + 1))
-                foreach (var z in Enumerable.Range(0, dimZ * 2 + 1))
-                    coulombSplit[x, y, z] = 
-                        1.0 / Math.Sqrt(
-                            Math.Pow((x - dimX - 0.5)*gX, 2) + 
-                            Math.Pow((y - dimY - 0.5)*gY, 2) + 
-                            Math.Pow((z - dimZ - 0.5)*gZ, 2));
-            } else coulombSplit = coulomb;
+            // if (coulomb == null) {
+            //     foreach (var x in Enumerable.Range(0, dimX * 2 + 1))
+            //     foreach (var y in Enumerable.Range(0, dimY * 2 + 1))
+            //     foreach (var z in Enumerable.Range(0, dimZ * 2 + 1))
+            //         coulombSplit[x, y, z] = 
+            //             1.0 / Math.Sqrt(
+            //                 Math.Pow((x - dimX - 0.5)*gX, 2) + 
+            //                 Math.Pow((y - dimY - 0.5)*gY, 2) + 
+            //                 Math.Pow((z - dimZ - 0.5)*gZ, 2));
+            // } else 
+                coulombSplit = coulomb;
 
             Complex[,,] f1Split = new Complex[
                 dimX + 1,
@@ -520,7 +522,8 @@ namespace NnManager {
             return new ScalarField(
                 MultiplyInplace(
                     conv, 
-                    CoulombConstant() * (gX * gY * gZ)),
+                    (gX * gY * gZ)),
+                // conv,
                 f1.Coords
             );
         }
@@ -528,9 +531,15 @@ namespace NnManager {
         public static Complex Coulomb(
                 ScalarField f1, 
                 ScalarField f2, 
-                Complex[,,]? coulomb = null, 
+                Complex[,,] coulomb, 
                 Dictionary<Complex[,,], Complex[,,]>? ftDict = null) {
 
+            var xC = f1.Coords[Dim.X].Count / 2;
+            var yC = f1.Coords[Dim.Y].Count / 2;
+            var zC = f1.Coords[Dim.Z].Count / 2;
+            double gX = f1.Coords[Dim.X][xC] - f1.Coords[Dim.X][xC-1];
+            double gY = f1.Coords[Dim.Y][yC] - f1.Coords[Dim.Y][yC-1];
+            double gZ = f1.Coords[Dim.Z][zC] - f1.Coords[Dim.Z][zC-1];
             
             #region oldCoulomb
             // // Prepare Coulomb field
@@ -572,7 +581,7 @@ namespace NnManager {
             #endregion
 
             return InnerProduct(
-                f1.Data, 
+                (f1 * (gX * gY * gZ)).Data, 
                 CoulombPotential_ByConvolutionWithKernel(f2, coulomb).Data);
         }
         

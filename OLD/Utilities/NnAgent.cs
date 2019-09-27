@@ -237,7 +237,12 @@ namespace NnManager {
                         Math.Pow((y - dimY - 0.5)*gY, 2) + 
                         Math.Pow((z - dimZ - 0.5)*gZ, 2));
             
-            return coulomb;
+            // return coulomb;
+            return 
+                ScalarField.MultiplyInplace(
+                    coulomb, 
+                    ScalarField.CoulombConstant()
+                );
         }
     }
 }
