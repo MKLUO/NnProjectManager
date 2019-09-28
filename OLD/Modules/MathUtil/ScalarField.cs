@@ -585,6 +585,10 @@ namespace NnManager {
                 CoulombPotential_ByConvolutionWithKernel(f2, coulomb).Data);
         }
         
+        public static Complex CircularCoulomb(ScalarField x, ScalarField y, ScalarField z, Complex[,,] coulomb) =>
+            Coulomb(x, y, coulomb) +
+            Coulomb(y, z, coulomb) +
+            Coulomb(z, x, coulomb);
 
         public static Complex InnerProduct(Complex[,,] left, Complex[,,] right) {
             var dimX = Math.Min(left.GetLength(0), right.GetLength(0));

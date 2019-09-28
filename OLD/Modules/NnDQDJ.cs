@@ -124,8 +124,9 @@ namespace NnManager {
 
             if (order < 1)
                 return false;
-            if (order > new [] { specLU.Count(), specLD.Count(), specRU.Count(), specRD.Count() }.Min())
-                return false;
+            var maxOrder = new [] { specLU.Count(), specLD.Count(), specRU.Count(), specRD.Count() }.Min();
+            if (order > maxOrder)
+                order = maxOrder;
 
             var lUWF = new List < (double energy, ScalarField wf) > ();
             var lDWF = new List < (double energy, ScalarField wf) > ();
@@ -311,36 +312,35 @@ namespace NnManager {
             options.TryGetValue("3particle", out string? do3Particle);
 
             double? p3GSE = null;
+            var apb3 = new List < (int i, int j, int k, string name) > ();
+            for (int i = 0; i < order * 2; i++)
+                for (int j = 0; j < order * 2; j++)
+                    for (int k = j + 1; k < order * 2; k++)
+                        apb3.Add((i, j, k, $""));
+
+            var pb3 = new List < (int i, int j, int k, string name) > ();
+            for (int i = 0; i < order * 2; i++)
+                for (int j = i + 1; j < order * 2; j++)
+                    for (int k = j + 1; k < order * 2; k++)
+                        pb3.Add((i, j, k, $""));
+
+            // var hamUUU = new Complex[pb3.Count(), pb3.Count()];
+            var hamDDD = new Complex[pb3.Count(), pb3.Count()];
+            var hamUDD = new Complex[apb3.Count(), apb3.Count()];
+            var hamDUU = new Complex[apb3.Count(), apb3.Count()];
+            var cHamDDD = new Complex[pb3.Count(), pb3.Count()];
+            var cHamUDD = new Complex[apb3.Count(), apb3.Count()];
+            var cHamDUU = new Complex[apb3.Count(), apb3.Count()];
+
             if (do3Particle == "yes") {
                 //// NOTE: 3-particle basis (notation: (spin-up WF, spin-down WF, spin-down WF)) (ordering: left-GS, left-1stEX, ... , right-GS, right-1stEX, ...)
-                var apb3 = new List < (int i, int j, int k, string name) > ();
-                for (int i = 0; i < order * 2; i++)
-                    for (int j = 0; j < order * 2; j++)
-                        for (int k = j + 1; k < order * 2; k++)
-                            apb3.Add((i, j, k, $""));
-
-                var pb3 = new List < (int i, int j, int k, string name) > ();
-                for (int i = 0; i < order * 2; i++)
-                    for (int j = i + 1; j < order * 2; j++)
-                        for (int k = j + 1; k < order * 2; k++)
-                            pb3.Add((i, j, k, $""));
-
-                var hamUUU = new Complex[pb3.Count(), pb3.Count()];
-                var hamDDD = new Complex[pb3.Count(), pb3.Count()];
-                var hamUDD = new Complex[apb3.Count(), apb3.Count()];
-                var hamDUU = new Complex[apb3.Count(), apb3.Count()];
-
-                Complex CircularCoulomb(ScalarField x, ScalarField y, ScalarField z) =>
-                    ScalarField.Coulomb(x, y, coulomb) +
-                    ScalarField.Coulomb(y, z, coulomb) +
-                    ScalarField.Coulomb(z, x, coulomb);
 
                 // FIXME: Since what we need here is only 3-particle GS energy, can I omit UDD & DUU? (Probably no. It's possible that energies of DDD exceed UDD & DUU.)
-                foreach (var(name, ham, basis, denSet1, denSet2, denSet3, spb1, spb2, spb3) in new [] {
+                foreach (var(name, ham, cHam, basis, denSet1, denSet2, denSet3, spb1, spb2, spb3) in new [] {
                         // ("UUU", hamUUU, pb3, denUp, denUp, denUp, uWF, uWF, uWF), // NOTE: UUU should never be GS
-                        ("DDD", hamDDD, pb3, denDown, denDown, denDown, dWF, dWF, dWF),
-                        ("UDD", hamUDD, apb3, denUp, denDown, denDown, uWF, dWF, dWF),
-                        ("DUU", hamDUU, apb3, denDown, denUp, denUp, dWF, uWF, uWF),
+                        ("DDD", hamDDD, cHamDDD, pb3, denDown, denDown, denDown, dWF, dWF, dWF),
+                        ("UDD", hamUDD, cHamUDD, apb3, denUp, denDown, denDown, uWF, dWF, dWF),
+                        ("DUU", hamDUU, cHamDUU, apb3, denDown, denUp, denUp, dWF, uWF, uWF),
                     }) {
                     for (int i = 0; i < basis.Count(); i++)
                         for (int j = i; j < basis.Count(); j++) {
@@ -360,17 +360,25 @@ namespace NnManager {
                             var den32 = denSet3[basis[i].k, basis[j].j];
 
                             if (basis == pb3)
-                                ham[i, j] = +1.0 * CircularCoulomb(den11, den22, den33) +
-                                +2.0 * CircularCoulomb(den12, den23, den31).Real +
-                                -1.0 * CircularCoulomb(den11, den23, den32) +
-                                -1.0 * CircularCoulomb(den22, den31, den13) +
-                                -1.0 * CircularCoulomb(den33, den12, den21);
+                                ham[i, j] = 
+                                    +1.0 * ScalarField.CircularCoulomb(den11, den22, den33, coulomb) +
+                                    +2.0 * ScalarField.CircularCoulomb(den12, den23, den31, coulomb).Real +
+                                    -1.0 * ScalarField.CircularCoulomb(den11, den23, den32, coulomb) +
+                                    -1.0 * ScalarField.CircularCoulomb(den22, den31, den13, coulomb) +
+                                    -1.0 * ScalarField.CircularCoulomb(den33, den12, den21, coulomb);
                             else if (basis == apb3)
-                                ham[i, j] = +1.0 * CircularCoulomb(den11, den22, den33) +
-                                -1.0 * CircularCoulomb(den11, den23, den32);
+                                ham[i, j] = 
+                                    +1.0 * ScalarField.CircularCoulomb(den11, den22, den33, coulomb) +
+                                    -1.0 * ScalarField.CircularCoulomb(den11, den23, den32, coulomb);
+
+                            cHam[i, j] = ham[i, j];
+                            cHam[j, i] = 
+                                new Complex(
+                                    ham[i, j].Real, -ham[i, j].Imaginary
+                                );
 
                             if (i == j)
-                                ham[i, j] += spb1[basis[i].i].energy + spb2[basis[i].j].energy + spb3[basis[i].k].energy;
+                                ham[i, j] += spb1[basis[i].i].energy + spb2[basis[i].j].energy + spb3[basis[i].k].energy;                                
 
                             //// Hamiltonians are Hermitian
                             if (i == j)
@@ -388,6 +396,15 @@ namespace NnManager {
                         Eigen.EVD(hamDUU, 1) [0].val
                 }.Min();
             }
+
+            // FIXME: For debug
+            var EValDDD = Eigen.EVD(hamDDD, 10).Select((_, val) => val);
+            var EValUDD = Eigen.EVD(hamUDD, 10).Select((_, val) => val);
+            var EValDUU = Eigen.EVD(hamDUU, 10).Select((_, val) => val);
+
+            var EVecDDD = Eigen.EVD(hamDDD, 10).Select((vec, _) => vec);
+            var EVecUDD = Eigen.EVD(hamUDD, 10).Select((vec, _) => vec);
+            var EVecDUU = Eigen.EVD(hamDUU, 10).Select((vec, _) => vec);
 
             ////// NOTE: Diagonalization (of 2-particle Ham.)
             SetStatus("Diagonalizing Hamiltonians ...");
@@ -490,16 +507,21 @@ namespace NnManager {
                 // NnDQDJEnergies = new List<double>{p0GSE, p1GSE, p2GSE};
             }
 
+            string coulombinfo = 
+                $"\nCoulomb energy (AP: LL, LR, RR):\n {cHamAP[0,0].Real}, {cHamAP[order,order].Real}, {cHamAP[2*order*order+order,2*order*order+order].Real}";
+
             verbalReport +=
                 uuInfo + "\n" +
                 udInfo + "\n" +
                 duInfo + "\n" +
                 ddInfo + "\n" +
                 ensembleGSinfo +
-                apGSinfo;
+                apGSinfo + 
+                coulombinfo;
 
             File.WriteAllText(NnDQDJResultPath, $"\n{J}");
             File.WriteAllText(NnDQDJReportPath, verbalReport);
+            File.WriteAllText(NnDQDJPath.SubPath($"_Report{order}{do3Particle}.txt"), verbalReport);
 
             return true;
         }
