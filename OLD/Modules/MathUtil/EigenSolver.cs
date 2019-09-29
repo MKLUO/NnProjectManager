@@ -9,12 +9,14 @@ namespace NnManager {
 
     static public class Eigen {
 
-        public static List<(Complex[] vec, double val)> EVD(Complex[,] input, int evNum) {
+        public static List<(Complex[] vec, double val)> EVD(Complex[,] input, int evNum = 0) {
 
             var dim  = input.GetLength(0);
             var dimY = input.GetLength(1);
 
             if (dim != dimY) return new List<(Complex[] vec, double val)>();
+
+            evNum = (evNum == 0) ? dim : evNum;
 
             var inputAlg = new alglib.complex[dim, dim];
             foreach (var i in Enumerable.Range(0, dim))

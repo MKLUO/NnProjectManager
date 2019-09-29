@@ -113,7 +113,7 @@ namespace NnManager {
                 if (energy == null)
                     return false;
 
-                for (int i = 0; i < new [] { energy.Count(), id.Count() }.Min(); i++)
+                for (int i = 0; i < id.Where(x => x.Item2 != "-1").Count(); i++)
                     spec.Add((
                         int.Parse(id[i].Item2),
                         Double.Parse(energy[i].Item2)
@@ -124,9 +124,14 @@ namespace NnManager {
 
             if (order < 1)
                 return false;
-            var maxOrder = new [] { specLU.Count(), specLD.Count(), specRU.Count(), specRD.Count() }.Min();
-            if (order > maxOrder)
-                order = maxOrder;
+            // var maxOrder = new [] { specLU.Count(), specLD.Count(), specRU.Count(), specRD.Count() }.Min();
+            // if (order > maxOrder)
+            //     order = maxOrder;
+
+            var orderLU = Math.Min(specLU.Count(), order);
+            var orderLD = Math.Min(specLD.Count(), order);
+            var orderRU = Math.Min(specRU.Count(), order);
+            var orderRD = Math.Min(specRD.Count(), order);
 
             var lUWF = new List < (double energy, ScalarField wf) > ();
             var lDWF = new List < (double energy, ScalarField wf) > ();
@@ -137,13 +142,14 @@ namespace NnManager {
 
             var NNPath = NnMainIsNonSC() ? NnMainNonSCPath : NnMainPath;
 
-            for (int i = 0; i < order; i++) {
-                foreach ((var wfCollection, var spec, var spin) in new [] {
-                        (lDWF, specLD, NnAgent.Spin.Down),
-                        (lUWF, specLU, NnAgent.Spin.Up),
-                        (rDWF, specRD, NnAgent.Spin.Down),
-                        (rUWF, specRU, NnAgent.Spin.Up)
-                    }) {
+            // for (int i = 0; i < order; i++) {
+            foreach ((var wfCollection, var spec, var spin, var ord) in new [] {
+                    (lDWF, specLD, NnAgent.Spin.Down, orderLD),
+                    (lUWF, specLU, NnAgent.Spin.Up,   orderLU),
+                    (rDWF, specRD, NnAgent.Spin.Down, orderRD),
+                    (rUWF, specRU, NnAgent.Spin.Up,   orderRU)
+                }) {
+                for (int i = 0; i < ord; i++) {
                     var wfs = NnAgent.NnAmplFileEntry(NnAgent.BandType.X1, spec[i].Id, spin);
                     (var wfImagData, var wfImagCoord, _, _) = NnAgent.GetCoordAndDat(NNPath, wfs.imag);
                     (var wfRealData, var wfRealCoord, _, _) = NnAgent.GetCoordAndDat(NNPath, wfs.real);
@@ -168,6 +174,7 @@ namespace NnManager {
                     ));
                 }
             }
+            // }
 
             ////// NOTE: Calculate Coulomb Kernel
             var coulomb = NnAgent.CoulombKernel(lDWF[0].wf);
@@ -186,13 +193,13 @@ namespace NnManager {
             }
 
             if (!NnMainIsNonSC())
-                foreach (var wfCollection in new [] {
-                        lDWF,
-                        lUWF,
-                        rDWF,
-                        rUWF
+                foreach ((var wfCollection, var ord) in new [] {
+                        (lDWF, orderLD),
+                        (lUWF, orderLU),
+                        (rDWF, orderRD),
+                        (rUWF, orderRU)
                     })
-                    for (int i = 0; i < order; i++) {
+                    for (int i = 0; i < ord; i++) {
                         wfCollection[i] = (
                             wfCollection[i].energy -
                             ScalarField.Coulomb(
@@ -213,15 +220,18 @@ namespace NnManager {
             var uWF = lUWF.Concat(rUWF).ToList();
             var dWF = lDWF.Concat(rDWF).ToList();
 
-            var denUp = new ScalarField[order * 2, order * 2];
-            var denDown = new ScalarField[order * 2, order * 2];
+            var orderU = orderLU + orderRU;
+            var orderD = orderLD + orderRD;
 
-            foreach (var(den, wf) in new [] {
-                    (denUp, uWF),
-                    (denDown, dWF)
+            var denUp = new ScalarField[orderU, orderU];
+            var denDown = new ScalarField[orderD, orderD];
+
+            foreach (var(den, wf, ord) in new [] {
+                    (denUp, uWF, orderU),
+                    (denDown, dWF, orderD)
                 })
-                for (int i = 0; i < order * 2; i++)
-                    for (int j = i; j < order * 2; j++) {
+                for (int i = 0; i < ord; i++)
+                    for (int j = i; j < ord; j++) {
                         var wf1 = wf[i].wf;
                         var wf2 = wf[j].wf;
                         den[i, j] = wf1 * wf2.Conj();
@@ -234,26 +244,36 @@ namespace NnManager {
             //// Expected AP (1, 1) GSs: apb[order] (0, order), apb[2*order*order]       (order, 0)
             //// Expected AP (2, 0) GSs: apb[0]     (0, 0),     apb[2*order*order+order] (order, order)
             //// Expected P  (1, 1) GSs: pb[order]  (0, order - 1)
-            var apb = new List < (int i, int j, string name) > ();
-            for (int i = 0; i < order * 2; i++)
-                for (int j = 0; j < order * 2; j++)
-                    apb.Add((i, j, $""));
+            string BasisIdxToTag(int idx, int order) {
+                if (idx >= order) return $"R{idx - order}";
+                else return $"L{idx}";
+            }
 
-            var pb = new List < (int i, int j, string name) > ();
-            for (int i = 0; i < order * 2; i++)
-                for (int j = i + 1; j < order * 2; j++)
-                    pb.Add((i, j, $""));
+            var apb = new List < (int i, int j, string name) > ();
+            for (int i = 0; i < orderU; i++)
+                for (int j = 0; j < orderD; j++)
+                    apb.Add((i, j, $"({BasisIdxToTag(i, orderLU)},{BasisIdxToTag(j, orderLD)})"));
+
+            var uub = new List < (int i, int j, string name) > ();
+            for (int i = 0; i < orderU; i++)
+                for (int j = i + 1; j < orderU; j++)
+                    uub.Add((i, j, $"({BasisIdxToTag(i, orderLU)},{BasisIdxToTag(j, orderLU)})"));
+
+            var ddb = new List < (int i, int j, string name) > ();
+            for (int i = 0; i < orderD; i++)
+                for (int j = i + 1; j < orderD; j++)
+                    ddb.Add((i, j, $"({BasisIdxToTag(i, orderLD)},{BasisIdxToTag(j, orderLD)})"));
 
             //// NOTE: Evaluate Hamiltonians & diagonalize
             ////// energy = bound state energy + coulomb repulsion
 
             var hamAP = new Complex[apb.Count(), apb.Count()];
-            var hamUU = new Complex[pb.Count(), pb.Count()];
-            var hamDD = new Complex[pb.Count(), pb.Count()];
+            var hamUU = new Complex[uub.Count(), uub.Count()];
+            var hamDD = new Complex[ddb.Count(), ddb.Count()];
 
             var cHamAP = new Complex[apb.Count(), apb.Count()];
-            var cHamUU = new Complex[pb.Count(), pb.Count()];
-            var cHamDD = new Complex[pb.Count(), pb.Count()];
+            var cHamUU = new Complex[uub.Count(), uub.Count()];
+            var cHamDD = new Complex[ddb.Count(), ddb.Count()];
 
             // options.TryGetValue("enableFTDict", out string? enableFTDicts);
             Dictionary<Complex[, , ], Complex[, , ]> ? ftDict = null;
@@ -262,8 +282,8 @@ namespace NnManager {
 
             foreach (var(name, ham, cHam, basis, selCoef, denSet1, denSet2, spb1, spb2) in new [] {
                     ("AP", hamAP, cHamAP, apb, 0.0, denUp, denDown, uWF, dWF),
-                    ("UU", hamUU, cHamUU, pb, -1.0, denUp, denUp, uWF, uWF),
-                    ("DD", hamDD, cHamDD, pb, -1.0, denDown, denDown, dWF, dWF)
+                    ("UU", hamUU, cHamUU, uub, -1.0, denUp, denUp, uWF, uWF),
+                    ("DD", hamDD, cHamDD, ddb, -1.0, denDown, denDown, dWF, dWF)
                 }) {
                 for (int i = 0; i < basis.Count(); i++)
                     for (int j = i; j < basis.Count(); j++) {
@@ -273,14 +293,14 @@ namespace NnManager {
                         var den1 = denSet1[basis[i].i, basis[j].i]; // xx
                         var den2 = denSet2[basis[i].j, basis[j].j]; // yy
 
-                        var den3 = denSet1[basis[i].i, basis[j].j]; // xy
-                        var den4 = denSet2[basis[i].j, basis[j].i]; // yx
-
                         cHam[i, j] = ScalarField.Coulomb(den1, den2, coulomb, ftDict);
 
                         //// NOTE: In parallel spin states, conjugate term of orbital WF also contributes to ham.
-                        if (selCoef != 0.0)
+                        if (selCoef != 0.0) {
+                            var den3 = denSet1[basis[i].i, basis[j].j]; // xy
+                            var den4 = denSet2[basis[i].j, basis[j].i]; // yx
                             cHam[i, j] += selCoef * ScalarField.Coulomb(den3, den4, coulomb, ftDict);
+                        }
 
                         var eigenEnergy = 0.0;
                         if ((basis[i].i == basis[j].i) && (basis[i].j == basis[j].j))
@@ -398,13 +418,12 @@ namespace NnManager {
             }
 
             // FIXME: For debug
-            var EValDDD = Eigen.EVD(hamDDD, 10).Select((_, val) => val);
-            var EValUDD = Eigen.EVD(hamUDD, 10).Select((_, val) => val);
-            var EValDUU = Eigen.EVD(hamDUU, 10).Select((_, val) => val);
-
-            var EVecDDD = Eigen.EVD(hamDDD, 10).Select((vec, _) => vec);
-            var EVecUDD = Eigen.EVD(hamUDD, 10).Select((vec, _) => vec);
-            var EVecDUU = Eigen.EVD(hamDUU, 10).Select((vec, _) => vec);
+            List<(Complex[] vec, double val)> EVecDDD, EVecUDD, EVecDUU;
+            if (do3Particle == "yes") {
+                EVecDDD = Eigen.EVD(hamDDD).ToList();
+                EVecUDD = Eigen.EVD(hamUDD).ToList();
+                EVecDUU = Eigen.EVD(hamDUU).ToList();
+            }
 
             ////// NOTE: Diagonalization (of 2-particle Ham.)
             SetStatus("Diagonalizing Hamiltonians ...");
@@ -419,22 +438,18 @@ namespace NnManager {
 
             ////// NOTE: Corrected energy
 
-            string reportEnergy = "";
-            reportEnergy += "no. energy-left-up(eV) energy-left-down(eV) energy-right-up(eV) energy-right-down(eV)\n";
-            for (int i = 0; i < order; i++) {
-                reportEnergy += $"{i} {lUWF[i].energy} {lDWF[i].energy} {rUWF[i].energy} {rDWF[i].energy}\n";
-            }
-            File.WriteAllText(NnDQDJCorrectedEnergyPath, reportEnergy);
+            // string reportEnergy = "";
+            // reportEnergy += "no. energy-left-up(eV) energy-left-down(eV) energy-right-up(eV) energy-right-down(eV)\n";
+            // for (int i = 0; i < order; i++) {
+            //     reportEnergy += $"{i} {lUWF[i].energy} {lDWF[i].energy} {rUWF[i].energy} {rDWF[i].energy}\n";
+            // }
+            // File.WriteAllText(NnDQDJCorrectedEnergyPath, reportEnergy);
 
             ////// NOTE: J
             var J = apEigen[0].val + apEigen[1].val - uuEigen[0].val - ddEigen[0].val;
             verbalReport += $"J = {J.ToString("E04")} (eV), order = {order}\n";
 
             ////// NOTE: Pickup eigenstates (candidates), label them by their leading components.
-            string BasisIdxToTag(int idx) {
-                if (idx >= order) return $"R{idx - order}";
-                else return $"L{idx}";
-            }
 
             string
             udInfo = $"[1, 0]: none",
@@ -444,8 +459,8 @@ namespace NnManager {
             foreach (var(eig, basis, spb1, spb2) in new [] {
                     (apEigen[0], apb, uWF, dWF),
                     (apEigen[1], apb, uWF, dWF),
-                    (uuEigen[0], pb, uWF, uWF),
-                    (ddEigen[0], pb, dWF, dWF)
+                    (uuEigen[0], uub, uWF, uWF),
+                    (ddEigen[0], ddb, dWF, dWF)
                 }) {
                 var energy = eig.val;
 
@@ -462,27 +477,27 @@ namespace NnManager {
                 foreach (var comp in compList) {
                     var occup = comp.occup.Magnitude * comp.occup.Magnitude;
                     if (occup > 0.01) {
-                        compInfo += $"({BasisIdxToTag(basis[comp.index].i)},{BasisIdxToTag(basis[comp.index].j)}):{occup.ToString("0.000")} ";
+                        compInfo += $"{basis[comp.index].name}:{occup.ToString("0.000")} ";
                     }
                 }
 
-                if (basis == apb) {
+                // if (basis == apb) {
                     // if ((leadPair.i, leadPair.j) == (0, order))
                     //     udInfo = $"[1, 0]: " + energyInfo + "\n" + compInfo;
                     // if ((leadPair.i, leadPair.j) == (order, 0))
                     //     duInfo = $"[0, 1]: " + energyInfo + "\n" + compInfo;
-                    if (eig == apEigen[0])
-                        udInfo = $"[1, 0]: " + energyInfo + "\n" + compInfo;
-                    if (eig == apEigen[1])
-                        duInfo = $"[0, 1]: " + energyInfo + "\n" + compInfo;
-                }
+                if (eig == apEigen[0])
+                    udInfo = $"[1, 0]: " + energyInfo + "\n" + compInfo;
+                if (eig == apEigen[1])
+                    duInfo = $"[0, 1]: " + energyInfo + "\n" + compInfo;
+                // }
 
-                if (basis == pb) {
-                    if (eig == uuEigen[0])
-                        uuInfo = $"[1, 1]: " + energyInfo + "\n" + compInfo;
-                    if (eig == ddEigen[0])
-                        ddInfo = $"[0, 0]: " + energyInfo + "\n" + compInfo;
-                }
+                // if (basis == pb) {
+                if (eig == uuEigen[0])
+                    uuInfo = $"[1, 1]: " + energyInfo + "\n" + compInfo;
+                if (eig == ddEigen[0])
+                    ddInfo = $"[0, 0]: " + energyInfo + "\n" + compInfo;
+                // }
             }
 
             /// NOTE: Pick up lowest 3 energy in AP
@@ -508,7 +523,7 @@ namespace NnManager {
             }
 
             string coulombinfo = 
-                $"\nCoulomb energy (AP: LL, LR, RR):\n {cHamAP[0,0].Real}, {cHamAP[order,order].Real}, {cHamAP[2*order*order+order,2*order*order+order].Real}";
+                $"\nCoulomb energy (AP: LL, LR, RR):\n {cHamAP[0,0].Real}, {cHamAP[orderLD,orderLD].Real}, {cHamAP[orderLU*orderD+orderLD,orderLU*orderD+orderLD].Real}";
 
             verbalReport +=
                 uuInfo + "\n" +

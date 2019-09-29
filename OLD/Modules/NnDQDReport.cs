@@ -257,7 +257,10 @@ namespace NnManager {
             reportId     += "no. id-left-up id-left-down id-right-up id-right-down\n";
             reportEnergy += "no. energy-left-up(eV) energy-left-down(eV) energy-right-up(eV) energy-right-down(eV)\n";
 
-            var boundStateCount = new []{specLU.Count(), specLD.Count(), specRU.Count(), specRD.Count()}.Min();
+            var boundStateCount = new []{specLU.Count(), specLD.Count(), specRU.Count(), specRD.Count()}.Max();
+            foreach (var spec in new [] {specLU, specLD, specRU, specRD})
+                if (spec.Count() < boundStateCount)
+                    spec.AddRange(Enumerable.Repeat((-1, 0.0), boundStateCount - spec.Count()));
 
             for (int i = 0; i < boundStateCount ; i++) {
                 reportId     += $"{i} {specLU[i].Id} {specLD[i].Id} {specRU[i].Id} {specRD[i].Id}\n";
@@ -268,7 +271,7 @@ namespace NnManager {
             File.WriteAllText(NnDQDReportEnergyPath, reportEnergy);
             File.WriteAllText(NnDQDReportIdPath,     reportId);
             File.WriteAllText(NnDQDReportMiscPath, 
-                $"\n({occupL}, {occupR})\nBound State #: {boundStateCount}");
+                $"\n({occupL}, {occupR})\nBound State # (LU, LD, RU, RD):\n({lUSpecCount}, {lDSpecCount}, {rUSpecCount}, {rDSpecCount})");
 
 
             return true;
