@@ -428,7 +428,7 @@ namespace NnManager {
             ////// NOTE: Diagonalization (of 2-particle Ham.)
             SetStatus("Diagonalizing Hamiltonians ...");
 
-            var apEigen = Eigen.EVD(hamAP, 3);
+            var apEigen = Eigen.EVD(hamAP, 4);
             var uuEigen = Eigen.EVD(hamUU, 2);
             var ddEigen = Eigen.EVD(hamDD, 2);
 
@@ -476,7 +476,7 @@ namespace NnManager {
                 string compInfo = "    ";
                 foreach (var comp in compList) {
                     var occup = comp.occup.Magnitude * comp.occup.Magnitude;
-                    if (occup > 0.01) {
+                    if (occup > 0.003) {
                         compInfo += $"{basis[comp.index].name}:{occup.ToString("0.000")} ";
                     }
                 }
@@ -504,7 +504,7 @@ namespace NnManager {
             /// 
 
             double pGS = (uuEigen[0].val + ddEigen[0].val) * 0.5;
-            string apGSinfo = $"\nLowest 3 energy in AP:\n {apEigen[0].val - pGS}, {apEigen[1].val - pGS}, {apEigen[2].val - pGS}";
+            string apGSinfo = $"\nLowest 4 energy in AP (wrt. P):\n {apEigen[0].val - pGS}, {apEigen[1].val - pGS}, {apEigen[2].val - pGS}, {apEigen[3].val - pGS}";
 
             /// NOTE: Pick up ensemble GS for each particle num
             /// 
@@ -525,6 +525,9 @@ namespace NnManager {
             string coulombinfo = 
                 $"\nCoulomb energy (AP: LL, LR, RR):\n {cHamAP[0,0].Real}, {cHamAP[orderLD,orderLD].Real}, {cHamAP[orderLU*orderD+orderLD,orderLU*orderD+orderLD].Real}";
 
+            string hubbardinfo = 
+                $"\nHubbard energy (AP: U, t):\n {cHamAP[orderLU*orderD+orderLD,orderLU*orderD+orderLD].Real - cHamAP[orderLD,orderLD].Real}, {cHamAP[orderLD,orderLU*orderD+orderLD].Magnitude}";
+
             verbalReport +=
                 uuInfo + "\n" +
                 udInfo + "\n" +
@@ -532,7 +535,8 @@ namespace NnManager {
                 ddInfo + "\n" +
                 ensembleGSinfo +
                 apGSinfo + 
-                coulombinfo;
+                coulombinfo +
+                hubbardinfo;
 
             File.WriteAllText(NnDQDJResultPath, $"\n{J}");
             File.WriteAllText(NnDQDJReportPath, verbalReport);
