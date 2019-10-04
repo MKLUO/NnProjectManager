@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Text;
 // using System.Text.RegularExpressions;
 using System.Threading;
 
@@ -264,6 +265,22 @@ namespace NnManager {
                 for (int j = i + 1; j < orderD; j++)
                     ddb.Add((i, j, $"({BasisIdxToTag(i, orderLD)},{BasisIdxToTag(j, orderLD)})"));
 
+            // NOTE: (1, 1) (oob) / (2, 0) (ztb) subspaces of AP
+            var oob = new List < (int i, int j, string name) > ();
+            for (int i = orderLU; i < orderU; i++)
+                for (int j = 0; j < orderLD; j++)
+                    oob.Add((i, j, $"({BasisIdxToTag(i, orderLU)},{BasisIdxToTag(j, orderLD)})"));
+            for (int i = 0; i < orderLU; i++)
+                for (int j = orderLD; j < orderD; j++)
+                    oob.Add((i, j, $"({BasisIdxToTag(i, orderLU)},{BasisIdxToTag(j, orderLD)})"));
+            var ztb = new List < (int i, int j, string name) > ();
+            for (int i = 0; i < orderLU; i++)
+                for (int j = 0; j < orderLD; j++)
+                    ztb.Add((i, j, $"({BasisIdxToTag(i, orderLU)},{BasisIdxToTag(j, orderLD)})"));
+            for (int i = orderLU; i < orderU; i++)
+                for (int j = orderLD; j < orderD; j++)
+                    ztb.Add((i, j, $"({BasisIdxToTag(i, orderLU)},{BasisIdxToTag(j, orderLD)})"));
+
             //// NOTE: Evaluate Hamiltonians & diagonalize
             ////// energy = bound state energy + coulomb repulsion
 
@@ -271,9 +288,15 @@ namespace NnManager {
             var hamUU = new Complex[uub.Count(), uub.Count()];
             var hamDD = new Complex[ddb.Count(), ddb.Count()];
 
+            var hamOO = new Complex[oob.Count(), oob.Count()];
+            var hamZT = new Complex[ztb.Count(), ztb.Count()];
+
             var cHamAP = new Complex[apb.Count(), apb.Count()];
             var cHamUU = new Complex[uub.Count(), uub.Count()];
             var cHamDD = new Complex[ddb.Count(), ddb.Count()];
+
+            var cHamOO = new Complex[oob.Count(), oob.Count()];
+            var cHamZT = new Complex[ztb.Count(), ztb.Count()];
 
             // options.TryGetValue("enableFTDict", out string? enableFTDicts);
             Dictionary<Complex[, , ], Complex[, , ]> ? ftDict = null;
@@ -283,7 +306,10 @@ namespace NnManager {
             foreach (var(name, ham, cHam, basis, selCoef, denSet1, denSet2, spb1, spb2) in new [] {
                     ("AP", hamAP, cHamAP, apb, 0.0, denUp, denDown, uWF, dWF),
                     ("UU", hamUU, cHamUU, uub, -1.0, denUp, denUp, uWF, uWF),
-                    ("DD", hamDD, cHamDD, ddb, -1.0, denDown, denDown, dWF, dWF)
+                    ("DD", hamDD, cHamDD, ddb, -1.0, denDown, denDown, dWF, dWF),
+
+                    ("OO", hamOO, cHamOO, oob, 0.0, denUp, denDown, uWF, dWF),
+                    ("ZT", hamZT, cHamZT, ztb, 0.0, denUp, denDown, uWF, dWF)
                 }) {
                 for (int i = 0; i < basis.Count(); i++)
                     for (int j = i; j < basis.Count(); j++) {
@@ -429,8 +455,11 @@ namespace NnManager {
             SetStatus("Diagonalizing Hamiltonians ...");
 
             var apEigen = Eigen.EVD(hamAP, 4);
-            var uuEigen = Eigen.EVD(hamUU, 2);
-            var ddEigen = Eigen.EVD(hamDD, 2);
+            var uuEigen = Eigen.EVD(hamUU, 4);
+            var ddEigen = Eigen.EVD(hamDD, 4);
+
+            var ooEigen = Eigen.EVD(hamOO, 4);
+            var ztEigen = Eigen.EVD(hamZT, 4);
 
             //// NOTE: Create Reports (Verbal & NXY data)
             SetStatus("Writing Report ...");
@@ -451,16 +480,23 @@ namespace NnManager {
 
             ////// NOTE: Pickup eigenstates (candidates), label them by their leading components.
 
-            string
-            udInfo = $"[1, 0]: none",
-                duInfo = $"[0, 1]: none",
-                uuInfo = $"[1, 1]: none",
-                ddInfo = $"[0, 0]: none";
-            foreach (var(eig, basis, spb1, spb2) in new [] {
-                    (apEigen[0], apb, uWF, dWF),
-                    (apEigen[1], apb, uWF, dWF),
-                    (uuEigen[0], uub, uWF, uWF),
-                    (ddEigen[0], ddb, dWF, dWF)
+            StringBuilder
+                ap0Info = new StringBuilder($"[AP#0]: "),
+                ap1Info = new StringBuilder($"[AP#1]: "),
+                uu0Info = new StringBuilder($"[++#0]: "),
+                dd0Info = new StringBuilder($"[--#0]: "),                
+                oo0Info = new StringBuilder($"[11#0]: "),
+                oo1Info = new StringBuilder($"[11#1]: "),
+                zt0Info = new StringBuilder($"[02#1]: ");
+            foreach (var (infoBuilder, eig, basis, spb1, spb2) in new [] {
+                    (ap0Info, apEigen[0], apb, uWF, dWF),
+                    (ap1Info, apEigen[1], apb, uWF, dWF),
+                    (uu0Info, uuEigen[0], uub, uWF, uWF),
+                    (dd0Info, ddEigen[0], ddb, dWF, dWF),
+
+                    (oo0Info, ooEigen[0], oob, uWF, dWF),
+                    (oo1Info, ooEigen[1], oob, uWF, dWF),
+                    (zt0Info, ztEigen[0], ztb, uWF, dWF)
                 }) {
                 var energy = eig.val;
 
@@ -481,22 +517,24 @@ namespace NnManager {
                     }
                 }
 
+                infoBuilder.Append(energyInfo + "\n" + compInfo);
+
                 // if (basis == apb) {
                     // if ((leadPair.i, leadPair.j) == (0, order))
                     //     udInfo = $"[1, 0]: " + energyInfo + "\n" + compInfo;
                     // if ((leadPair.i, leadPair.j) == (order, 0))
                     //     duInfo = $"[0, 1]: " + energyInfo + "\n" + compInfo;
-                if (eig == apEigen[0])
-                    udInfo = $"[1, 0]: " + energyInfo + "\n" + compInfo;
-                if (eig == apEigen[1])
-                    duInfo = $"[0, 1]: " + energyInfo + "\n" + compInfo;
+                // if (eig == apEigen[0])
+                //     udInfo = $"[1, 0]: " + energyInfo + "\n" + compInfo;
+                // if (eig == apEigen[1])
+                //     duInfo = $"[0, 1]: " + energyInfo + "\n" + compInfo;
                 // }
 
                 // if (basis == pb) {
-                if (eig == uuEigen[0])
-                    uuInfo = $"[1, 1]: " + energyInfo + "\n" + compInfo;
-                if (eig == ddEigen[0])
-                    ddInfo = $"[0, 0]: " + energyInfo + "\n" + compInfo;
+                // if (eig == uuEigen[0])
+                //     uuInfo = $"[1, 1]: " + energyInfo + "\n" + compInfo;
+                // if (eig == ddEigen[0])
+                //     ddInfo = $"[0, 0]: " + energyInfo + "\n" + compInfo;
                 // }
             }
 
@@ -529,12 +567,16 @@ namespace NnManager {
                 $"\nHubbard energy (AP: U, t):\n {cHamAP[orderLU*orderD+orderLD,orderLU*orderD+orderLD].Real - cHamAP[orderLD,orderLD].Real}, {cHamAP[orderLD,orderLU*orderD+orderLD].Magnitude}";
 
             verbalReport +=
-                uuInfo + "\n" +
-                udInfo + "\n" +
-                duInfo + "\n" +
-                ddInfo + "\n" +
+                uu0Info + "\n" +
+                dd0Info + "\n" + "\n" +
+                zt0Info + "\n" +
+                oo1Info + "\n" +
+                oo0Info + "\n" + "\n" +
+                ap1Info + "\n" +
+                ap0Info + "\n" + "\n" +
+
                 ensembleGSinfo +
-                apGSinfo + 
+                // apGSinfo + 
                 coulombinfo +
                 hubbardinfo;
 
