@@ -67,6 +67,9 @@ namespace NnManager {
 
         bool NnDQDJExecute(CancellationToken ct, ImmutableDictionary<string, string> options) {
 
+            if (!Eigen.Test())
+                return false;
+
             // FIXME: Can it be reduced?
             options.TryGetValue("x0", out string? x0s);
             options.TryGetValue("x1", out string? x1s);
@@ -267,11 +270,11 @@ namespace NnManager {
 
             // NOTE: (1, 1) (oob) / (2, 0) (ztb) subspaces of AP
             var oob = new List < (int i, int j, string name) > ();
-            for (int i = orderLU; i < orderU; i++)
-                for (int j = 0; j < orderLD; j++)
-                    oob.Add((i, j, $"({BasisIdxToTag(i, orderLU)},{BasisIdxToTag(j, orderLD)})"));
             for (int i = 0; i < orderLU; i++)
                 for (int j = orderLD; j < orderD; j++)
+                    oob.Add((i, j, $"({BasisIdxToTag(i, orderLU)},{BasisIdxToTag(j, orderLD)})"));
+            for (int i = orderLU; i < orderU; i++)
+                for (int j = 0; j < orderLD; j++)
                     oob.Add((i, j, $"({BasisIdxToTag(i, orderLU)},{BasisIdxToTag(j, orderLD)})"));
             var ztb = new List < (int i, int j, string name) > ();
             for (int i = 0; i < orderLU; i++)
@@ -454,12 +457,67 @@ namespace NnManager {
             ////// NOTE: Diagonalization (of 2-particle Ham.)
             SetStatus("Diagonalizing Hamiltonians ...");
 
-            var apEigen = Eigen.EVD(hamAP, 4);
-            var uuEigen = Eigen.EVD(hamUU, 4);
-            var ddEigen = Eigen.EVD(hamDD, 4);
+            var apEigen = Eigen.EVD(hamAP, apb.Count);
+            var uuEigen = Eigen.EVD(hamUU, uub.Count);
+            var ddEigen = Eigen.EVD(hamDD, ddb.Count);
 
-            var ooEigen = Eigen.EVD(hamOO, 4);
-            var ztEigen = Eigen.EVD(hamZT, 4);
+            var ooEigen = Eigen.EVD(hamOO, oob.Count);
+            var ztEigen = Eigen.EVD(hamZT, ztb.Count);
+
+            var apVecs = apEigen.Select(x => x.vec).ToList();
+            var ooVecs = ooEigen.Select(x => x.vec).ToList();
+            var ztVecs = ztEigen.Select(x => x.vec).ToList();
+
+            //// NOTE: A more representative AP Hamiltonian (w/ (1,1) (2,0)/(0,2) diag. separately).
+            //// (1) Construct transformation matrices.
+            var ooztEigMat = new Complex[apb.Count, apb.Count];
+            var ooztToApMat = new Complex[apb.Count, apb.Count];
+            // E: Fill in the eigenvectors.
+            for (int i = 0; i < oob.Count; ++i)
+                for (int j = 0; j < oob.Count; ++j)
+                    ooztEigMat[j, i] = ooEigen[i].vec[j];
+            for (int i = 0; i < ztb.Count; ++i)
+                for (int j = 0; j < ztb.Count; ++j)
+                    ooztEigMat[j + oob.Count, i + oob.Count] = ztEigen[i].vec[j];    
+            // P: Permutation (from oo+zt => ap)        
+            for (int i = 0; i < orderLU; ++i)
+                for (int j = 0; j < orderRD; ++j)
+                    ooztToApMat[
+                        j + i * orderD  + orderLD, 
+                        j + i * orderRD] = 1.0;
+            for (int i = 0; i < orderRU; ++i)
+                for (int j = 0; j < orderLD; ++j)
+                    ooztToApMat[
+                        j + i * orderD  + orderLU * orderD, 
+                        j + i * orderLD + orderLU * orderRD] = 1.0;
+            for (int i = 0; i < orderLU; ++i)
+                for (int j = 0; j < orderLD; ++j)
+                    ooztToApMat[
+                        j + i * orderD, 
+                        j + i * orderLD + orderLU * orderRD + orderRU * orderLD] = 1.0;
+            for (int i = 0; i < orderRU; ++i)
+                for (int j = 0; j < orderRD; ++j)
+                    ooztToApMat[
+                        j + i * orderD  + orderLU * orderD + orderLD, 
+                        j + i * orderRD + orderLU * orderRD + orderRU * orderLD + orderLU * orderLD] = 1.0;
+                // if (i < apb.Count / 2)
+                //     ooztToApMat[i + apb.Count / 4, i] = 1.0;
+                // else if (i < apb.Count / 4 * 3)
+                //     ooztToApMat[i - apb.Count / 2, i] = 1.0;
+                // else 
+                //     ooztToApMat[i, i] = 1.0;
+            // Calculate E+P+(hamAP)PE
+            var pe = Eigen.Multiply(ooztToApMat, ooztEigMat);
+            var peA = Eigen.Adjoint(pe);
+
+            var hamAPdiag = Eigen.Multiply(
+                peA, 
+                Eigen.Multiply(hamAP, pe));
+
+            var cHamAPdiag = Eigen.Multiply(
+                peA, 
+                Eigen.Multiply(cHamAP, pe));
+
 
             //// NOTE: Create Reports (Verbal & NXY data)
             SetStatus("Writing Report ...");
@@ -487,7 +545,7 @@ namespace NnManager {
                 dd0Info = new StringBuilder($"[--#0]: "),                
                 oo0Info = new StringBuilder($"[11#0]: "),
                 oo1Info = new StringBuilder($"[11#1]: "),
-                zt0Info = new StringBuilder($"[02#1]: ");
+                zt0Info = new StringBuilder($"[02#0]: ");
             foreach (var (infoBuilder, eig, basis, spb1, spb2) in new [] {
                     (ap0Info, apEigen[0], apb, uWF, dWF),
                     (ap1Info, apEigen[1], apb, uWF, dWF),
@@ -551,20 +609,50 @@ namespace NnManager {
             double p1GSE = lDWF.Concat(lUWF).Concat(rDWF).Concat(rUWF).Select(x => x.energy).Min();
             double p2GSE = apEigen.Concat(uuEigen).Concat(ddEigen).Select(x => x.val).Min();
 
-            string ensembleGSinfo;
+            string ensembleGSInfo;
             if (p3GSE != null) {
-                ensembleGSinfo = $"\nEnsemble GS energy for 0/1/2/3 particles:\n {p0GSE}, {p1GSE}, {p2GSE}, {p3GSE}";
+                ensembleGSInfo = $"\nEnsemble GS energy for 0/1/2/3 particles:\n {p0GSE} {p1GSE} {p2GSE} {p3GSE}";
                 // NnDQDJEnergies = new List<double>{p0GSE, p1GSE, p2GSE, p3GSE ?? 0.0};
             } else {
-                ensembleGSinfo = $"\nEnsemble GS energy for 0/1/2 particles:\n {p0GSE}, {p1GSE}, {p2GSE}";
+                ensembleGSInfo = $"\nEnsemble GS energy for 0/1/2 particles:\n {p0GSE} {p1GSE} {p2GSE}";
                 // NnDQDJEnergies = new List<double>{p0GSE, p1GSE, p2GSE};
             }
 
-            string coulombinfo = 
-                $"\nCoulomb energy (AP: LL, LR, RR):\n {cHamAP[0,0].Real}, {cHamAP[orderLD,orderLD].Real}, {cHamAP[orderLU*orderD+orderLD,orderLU*orderD+orderLD].Real}";
+            string gsCoulombInfo = 
+                $"\n1PGS Coulomb energy (LR, LL, RR, t(LR/RR)):\n {cHamAP[orderLD,orderLD].Real} {cHamAP[0,0].Real} {cHamAP[orderLU*orderD+orderLD,orderLU*orderD+orderLD].Real} {cHamAP[orderLD,orderLU*orderD+orderLD].Magnitude}";
+            string coulombInfo = 
+                $"\nCoulomb energy (11#0, 11#1, 02#0, 02#1):\n {cHamAPdiag[0,0].Real} {cHamAPdiag[1,1].Real} {cHamAPdiag[oob.Count,oob.Count].Real} {cHamAPdiag[oob.Count + 1,oob.Count + 1].Real}";
+            string hamAPdiagInfo = 
+                $"\nCoulomb energy + Eig. (11#0, 11#1, 02#0, 02#1):\n {hamAPdiag[0,0].Real} {hamAPdiag[1,1].Real} {hamAPdiag[oob.Count,oob.Count].Real} {hamAPdiag[oob.Count + 1,oob.Count + 1].Real}";
+            
+            var t00 = cHamAPdiag[0,oob.Count  ].Magnitude;
+            var t01 = cHamAPdiag[0,oob.Count+1].Magnitude;
+            var t10 = cHamAPdiag[1,oob.Count  ].Magnitude;
+            var t11 = cHamAPdiag[1,oob.Count+1].Magnitude;
 
-            string hubbardinfo = 
-                $"\nHubbard energy (AP: U, t):\n {cHamAP[orderLU*orderD+orderLD,orderLU*orderD+orderLD].Real - cHamAP[orderLD,orderLD].Real}, {cHamAP[orderLD,orderLU*orderD+orderLD].Magnitude}";
+            string tunnelingInfo = 
+                $"\nTunneling energy (rms, avg, t00, t01, t10, t11):\n" + 
+                $" {Math.Sqrt(0.25 * (t00*t00 + t01*t01 + t10*t10 + t11*t11))} {0.25 * (t00 + t01 + t10 + t11)}\n" + 
+                $" {t00} {t01} {t10} {t11}";
+
+            StringBuilder  repulsionInfoBuilder = new StringBuilder();
+            StringBuilder cRepulsionInfoBuilder = new StringBuilder();
+
+            foreach (var (info, ham, comment) in new [] {
+                (repulsionInfoBuilder, hamAPdiag, "(w/ Eig.)"),
+                (cRepulsionInfoBuilder, cHamAPdiag, "")
+            })
+            {   
+                var u00 = (ham[oob.Count,oob.Count] - ham[0,0]).Real;
+                var u01 = (ham[oob.Count,oob.Count] - ham[1,1]).Real;
+                var u10 = (ham[oob.Count+1,oob.Count+1] - ham[0,0]).Real;
+                var u11 = (ham[oob.Count+1,oob.Count+1] - ham[1,1]).Real;
+                
+                info.Append( 
+                    $"\nRepulsion energy {comment} (rms, avg, u00, u01, u10, u11):\n" + 
+                    $" {Math.Sqrt(0.25 * (u00*u00 + u01*u01 + u10*u10 + u11*u11))} {0.25 * (u00 + u01 + u10 + u11)}\n" + 
+                    $" {u00} {u01} {u10} {u11}");
+            }
 
             verbalReport +=
                 uu0Info + "\n" +
@@ -575,10 +663,14 @@ namespace NnManager {
                 ap1Info + "\n" +
                 ap0Info + "\n" + "\n" +
 
-                ensembleGSinfo +
+                ensembleGSInfo +
                 // apGSinfo + 
-                coulombinfo +
-                hubbardinfo;
+                gsCoulombInfo +
+                coulombInfo +
+                hamAPdiagInfo +
+                tunnelingInfo +
+                repulsionInfoBuilder + 
+                cRepulsionInfoBuilder;
 
             File.WriteAllText(NnDQDJResultPath, $"\n{J}");
             File.WriteAllText(NnDQDJReportPath, verbalReport);
