@@ -361,25 +361,43 @@ namespace NnManager {
             options.TryGetValue("3particle", out string? do3Particle);
 
             double? p3GSE = null;
-            var apb3 = new List < (int i, int j, int k, string name) > ();
-            for (int i = 0; i < order * 2; i++)
-                for (int j = 0; j < order * 2; j++)
-                    for (int k = j + 1; k < order * 2; k++)
-                        apb3.Add((i, j, k, $""));
+            // var apb3 = new List < (int i, int j, int k, string name) > ();
+            // for (int i = 0; i < order * 2; i++)
+            //     for (int j = 0; j < order * 2; j++)
+            //         for (int k = j + 1; k < order * 2; k++)
+            //             apb3.Add((i, j, k, $""));
 
-            var pb3 = new List < (int i, int j, int k, string name) > ();
-            for (int i = 0; i < order * 2; i++)
-                for (int j = i + 1; j < order * 2; j++)
-                    for (int k = j + 1; k < order * 2; k++)
-                        pb3.Add((i, j, k, $""));
+            var uddb = new List < (int i, int j, int k, string name) > ();
+            for (int i = 0; i < orderU; i++)
+                for (int j = 0; j < orderD; j++)
+                    for (int k = j + 1; k < orderD; k++)
+                        uddb.Add((i, j, k, $"({BasisIdxToTag(i, orderLU)},{BasisIdxToTag(j, orderLD)},{BasisIdxToTag(k, orderLD)})"));
+
+            var duub = new List < (int i, int j, int k, string name) > ();
+            for (int i = 0; i < orderD; i++)
+                for (int j = 0; j < orderU; j++)
+                    for (int k = j + 1; k < orderU; k++)
+                        duub.Add((i, j, k, $"({BasisIdxToTag(i, orderLD)},{BasisIdxToTag(j, orderLU)},{BasisIdxToTag(k, orderLU)})"));
+
+            // var pb3 = new List < (int i, int j, int k, string name) > ();
+            // for (int i = 0; i < order * 2; i++)
+            //     for (int j = i + 1; j < order * 2; j++)
+            //         for (int k = j + 1; k < order * 2; k++)
+            //             pb3.Add((i, j, k, $""));
+
+            var dddb = new List < (int i, int j, int k, string name) > ();
+            for (int i = 0; i < orderD; i++)
+                for (int j = i + 1; j < orderD; j++)
+                    for (int k = j + 1; k < orderD; k++)
+                        dddb.Add((i, j, k, $"({BasisIdxToTag(i, orderLD)},{BasisIdxToTag(j, orderLD)},{BasisIdxToTag(k, orderLD)})"));
 
             // var hamUUU = new Complex[pb3.Count(), pb3.Count()];
-            var hamDDD = new Complex[pb3.Count(), pb3.Count()];
-            var hamUDD = new Complex[apb3.Count(), apb3.Count()];
-            var hamDUU = new Complex[apb3.Count(), apb3.Count()];
-            var cHamDDD = new Complex[pb3.Count(), pb3.Count()];
-            var cHamUDD = new Complex[apb3.Count(), apb3.Count()];
-            var cHamDUU = new Complex[apb3.Count(), apb3.Count()];
+            var hamDDD  = new Complex[dddb.Count(), dddb.Count()];
+            var hamUDD  = new Complex[uddb.Count(), uddb.Count()];
+            var hamDUU  = new Complex[duub.Count(), duub.Count()];
+            var cHamDDD = new Complex[dddb.Count(), dddb.Count()];
+            var cHamUDD = new Complex[uddb.Count(), uddb.Count()];
+            var cHamDUU = new Complex[duub.Count(), duub.Count()];
 
             if (do3Particle == "yes") {
                 //// NOTE: 3-particle basis (notation: (spin-up WF, spin-down WF, spin-down WF)) (ordering: left-GS, left-1stEX, ... , right-GS, right-1stEX, ...)
@@ -387,9 +405,9 @@ namespace NnManager {
                 // FIXME: Since what we need here is only 3-particle GS energy, can I omit UDD & DUU? (Probably no. It's possible that energies of DDD exceed UDD & DUU.)
                 foreach (var(name, ham, cHam, basis, denSet1, denSet2, denSet3, spb1, spb2, spb3) in new [] {
                         // ("UUU", hamUUU, pb3, denUp, denUp, denUp, uWF, uWF, uWF), // NOTE: UUU should never be GS
-                        ("DDD", hamDDD, cHamDDD, pb3, denDown, denDown, denDown, dWF, dWF, dWF),
-                        ("UDD", hamUDD, cHamUDD, apb3, denUp, denDown, denDown, uWF, dWF, dWF),
-                        ("DUU", hamDUU, cHamDUU, apb3, denDown, denUp, denUp, dWF, uWF, uWF),
+                        ("DDD", hamDDD, cHamDDD, dddb, denDown, denDown, denDown, dWF, dWF, dWF),
+                        ("UDD", hamUDD, cHamUDD, uddb, denUp, denDown, denDown, uWF, dWF, dWF),
+                        ("DUU", hamDUU, cHamDUU, duub, denDown, denUp, denUp, dWF, uWF, uWF),
                     }) {
                     for (int i = 0; i < basis.Count(); i++)
                         for (int j = i; j < basis.Count(); j++) {
@@ -408,14 +426,15 @@ namespace NnManager {
                             var den21 = denSet2[basis[i].j, basis[j].i];
                             var den32 = denSet3[basis[i].k, basis[j].j];
 
-                            if (basis == pb3)
+                            if (basis == dddb)
                                 ham[i, j] = 
                                     +1.0 * ScalarField.CircularCoulomb(den11, den22, den33, coulomb) +
                                     +2.0 * ScalarField.CircularCoulomb(den12, den23, den31, coulomb).Real +
                                     -1.0 * ScalarField.CircularCoulomb(den11, den23, den32, coulomb) +
                                     -1.0 * ScalarField.CircularCoulomb(den22, den31, den13, coulomb) +
                                     -1.0 * ScalarField.CircularCoulomb(den33, den12, den21, coulomb);
-                            else if (basis == apb3)
+                            //TODO:
+                            else
                                 ham[i, j] = 
                                     +1.0 * ScalarField.CircularCoulomb(den11, den22, den33, coulomb) +
                                     -1.0 * ScalarField.CircularCoulomb(den11, den23, den32, coulomb);
