@@ -466,11 +466,11 @@ namespace NnManager {
             }
 
             // FIXME: For debug
-            List<(Complex[] vec, double val)> EVecDDD, EVecUDD, EVecDUU;
+            List<Complex[]> EVecDDD, EVecUDD, EVecDUU;
             if (do3Particle == "yes") {
-                EVecDDD = Eigen.EVD(hamDDD).ToList();
-                EVecUDD = Eigen.EVD(hamUDD).ToList();
-                EVecDUU = Eigen.EVD(hamDUU).ToList();
+                EVecDDD = Eigen.EVD(hamDDD).Select(p => p.vec).ToList();
+                EVecUDD = Eigen.EVD(hamUDD).Select(p => p.vec).ToList();
+                EVecDUU = Eigen.EVD(hamDUU).Select(p => p.vec).ToList();
             }
 
             ////// NOTE: Diagonalization (of 2-particle Ham.)
