@@ -414,30 +414,58 @@ namespace NnManager {
 
                             SetStatus($"Evaluating {name}({i},{j}) ...");
 
-                            var den11 = denSet1[basis[i].i, basis[j].i];
-                            var den22 = denSet2[basis[i].j, basis[j].j];
-                            var den33 = denSet3[basis[i].k, basis[j].k];
+                            var den = new (ScalarField field, bool isDen)[3,3];
 
-                            var den12 = denSet1[basis[i].i, basis[j].j];
-                            var den23 = denSet2[basis[i].j, basis[j].k];
-                            var den31 = denSet3[basis[i].k, basis[j].i];
+                            foreach (int ci in Enumerable.Range(0, 3))
+                            foreach (int cj in Enumerable.Range(0, 3)) {
+                                var denSet = ci switch {
+                                    0 => denSet1,
+                                    1 => denSet2,
+                                    2 => denSet3,
+                                    _ => throw new Exception(),
+                                };
 
-                            var den13 = denSet1[basis[i].i, basis[j].k];
-                            var den21 = denSet2[basis[i].j, basis[j].i];
-                            var den32 = denSet3[basis[i].k, basis[j].j];
+                                var basisI = ci switch {
+                                    0 => basis[i].i,
+                                    1 => basis[i].j,
+                                    2 => basis[i].k,
+                                    _ => throw new Exception(),
+                                };
+
+                                var basisJ = cj switch {
+                                    0 => basis[j].i,
+                                    1 => basis[j].j,
+                                    2 => basis[j].k,
+                                    _ => throw new Exception(),
+                                };
+
+                                den[ci,cj] = (denSet[basisI, basisJ], basisI == basisJ);
+                            }
+
+                            // var den11 = denSet1[basis[i].i, basis[j].i];
+                            // var den22 = denSet2[basis[i].j, basis[j].j];
+                            // var den33 = denSet3[basis[i].k, basis[j].k];
+
+                            // var den12 = denSet1[basis[i].i, basis[j].j];
+                            // var den23 = denSet2[basis[i].j, basis[j].k];
+                            // var den31 = denSet3[basis[i].k, basis[j].i];
+
+                            // var den13 = denSet1[basis[i].i, basis[j].k];
+                            // var den21 = denSet2[basis[i].j, basis[j].i];
+                            // var den32 = denSet3[basis[i].k, basis[j].j];
 
                             if (basis == dddb)
                                 ham[i, j] = 
-                                    +1.0 * ScalarField.CircularCoulomb(den11, den22, den33, coulomb) +
-                                    +2.0 * ScalarField.CircularCoulomb(den12, den23, den31, coulomb).Real +
-                                    -1.0 * ScalarField.CircularCoulomb(den11, den23, den32, coulomb) +
-                                    -1.0 * ScalarField.CircularCoulomb(den22, den31, den13, coulomb) +
-                                    -1.0 * ScalarField.CircularCoulomb(den33, den12, den21, coulomb);
+                                    +1.0 * ScalarField.CircularCoulomb(den[0,0], den[1,1], den[2,2], coulomb) +
+                                    +2.0 * ScalarField.CircularCoulomb(den[0,1], den[1,2], den[2,0], coulomb).Real +
+                                    -1.0 * ScalarField.CircularCoulomb(den[0,0], den[1,2], den[2,1], coulomb) +
+                                    -1.0 * ScalarField.CircularCoulomb(den[1,1], den[2,0], den[0,2], coulomb) +
+                                    -1.0 * ScalarField.CircularCoulomb(den[2,2], den[0,1], den[1,0], coulomb);
                             //TODO:
                             else
                                 ham[i, j] = 
-                                    +1.0 * ScalarField.CircularCoulomb(den11, den22, den33, coulomb) +
-                                    -1.0 * ScalarField.CircularCoulomb(den11, den23, den32, coulomb);
+                                    +1.0 * ScalarField.CircularCoulomb(den[0,0], den[1,1], den[2,2], coulomb) +
+                                    -1.0 * ScalarField.CircularCoulomb(den[0,0], den[1,2], den[2,1], coulomb);
 
                             cHam[i, j] = ham[i, j];
                             cHam[j, i] = 
