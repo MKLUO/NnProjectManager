@@ -402,12 +402,12 @@ namespace NnManager {
             if (do3Particle == "yes") {
                 //// NOTE: 3-particle basis (notation: (spin-up WF, spin-down WF, spin-down WF)) (ordering: left-GS, left-1stEX, ... , right-GS, right-1stEX, ...)
 
-                // FIXME: Since what we need here is only 3-particle GS energy, can I omit UDD & DUU? (Probably no. It's possible that energies of DDD exceed UDD & DUU.)
+                // FIXME: UUU, DUU skipped. They shouldn't be ground state when B > 0.
                 foreach (var(name, ham, cHam, basis, denSet1, denSet2, denSet3, spb1, spb2, spb3) in new [] {
                         // ("UUU", hamUUU, pb3, denUp, denUp, denUp, uWF, uWF, uWF), // NOTE: UUU should never be GS
                         ("DDD", hamDDD, cHamDDD, dddb, denDown, denDown, denDown, dWF, dWF, dWF),
                         ("UDD", hamUDD, cHamUDD, uddb, denUp, denDown, denDown, uWF, dWF, dWF),
-                        ("DUU", hamDUU, cHamDUU, duub, denDown, denUp, denUp, dWF, uWF, uWF),
+                        // ("DUU", hamDUU, cHamDUU, duub, denDown, denUp, denUp, dWF, uWF, uWF),
                     }) {
                     for (int i = 0; i < basis.Count(); i++)
                         for (int j = i; j < basis.Count(); j++) {
@@ -439,6 +439,8 @@ namespace NnManager {
                                     _ => throw new Exception(),
                                 };
 
+                                if ((basisI >= denSet.GetLength(0)) || (basisJ >= denSet.GetLength(1)))
+                                    continue;
                                 den[ci,cj] = (denSet[basisI, basisJ], basisI == basisJ);
                             }
 
@@ -488,17 +490,15 @@ namespace NnManager {
 
                 p3GSE = new [] {
                     Eigen.EVD(hamDDD, 1) [0].val,
-                        Eigen.EVD(hamUDD, 1) [0].val,
-                        Eigen.EVD(hamDUU, 1) [0].val
+                        Eigen.EVD(hamUDD, 1) [0].val
                 }.Min();
             }
 
             // FIXME: For debug
-            List<Complex[]> EVecDDD, EVecUDD, EVecDUU;
+            List<Complex[]> EVecDDD, EVecUDD;
             if (do3Particle == "yes") {
                 EVecDDD = Eigen.EVD(hamDDD).Select(p => p.vec).ToList();
                 EVecUDD = Eigen.EVD(hamUDD).Select(p => p.vec).ToList();
-                EVecDUU = Eigen.EVD(hamDUU).Select(p => p.vec).ToList();
             }
 
             ////// NOTE: Diagonalization (of 2-particle Ham.)
