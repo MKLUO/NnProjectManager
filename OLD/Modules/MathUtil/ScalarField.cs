@@ -587,6 +587,9 @@ namespace NnManager {
             if (coulombCache?.ContainsKey((f1, f2)) ?? false)
                 return coulombCache[(f1, f2)];
 
+            if (coulombCache?.ContainsKey((f2, f1)) ?? false)
+                return coulombCache[(f2, f1)];
+
             var result = InnerProduct(
                 (f1 * (gX * gY * gZ)).Data, 
                 CoulombPotential_ByConvolutionWithKernel(f2, coulomb).Data);
