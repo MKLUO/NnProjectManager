@@ -528,11 +528,15 @@ namespace NnManager {
             );
         }
 
+        // public static Dictionary<(ScalarField, ScalarField), Complex> CoulombCache { get; } = new Dictionary<(ScalarField, ScalarField), Complex>();
+
+        // public static void ClearCoulombCache() => CoulombCache.Clear();
+
         public static Complex Coulomb(
                 ScalarField f1, 
                 ScalarField f2, 
                 Complex[,,] coulomb, 
-                Dictionary<Complex[,,], Complex[,,]>? ftDict = null) {
+                Dictionary<(ScalarField, ScalarField), Complex>? coulombCache = null) {
 
             var xC = f1.Coords[Dim.X].Count / 2;
             var yC = f1.Coords[Dim.Y].Count / 2;
@@ -580,16 +584,29 @@ namespace NnManager {
             // );
             #endregion
 
-            return InnerProduct(
+            if (coulombCache?.ContainsKey((f1, f2)) ?? false)
+                return coulombCache[(f1, f2)];
+
+            var result = InnerProduct(
                 (f1 * (gX * gY * gZ)).Data, 
                 CoulombPotential_ByConvolutionWithKernel(f2, coulomb).Data);
+            
+            if (coulombCache != null)
+                coulombCache[(f1, f2)] = result;            
+            
+            return result;
         }
         
-        public static Complex CircularCoulomb((ScalarField field, bool isDen) x, (ScalarField field, bool isDen) y, (ScalarField field, bool isDen) z, Complex[,,] coulomb) {
+        public static Complex CircularCoulomb(
+            (ScalarField field, bool isDen) x, 
+            (ScalarField field, bool isDen) y, 
+            (ScalarField field, bool isDen) z, 
+            Complex[,,] coulomb, 
+                Dictionary<(ScalarField, ScalarField), Complex>? coulombCache = null) {
             Complex result;
-            if (x.isDen) result += Coulomb(y.field, z.field, coulomb);
-            if (y.isDen) result += Coulomb(z.field, x.field, coulomb);
-            if (z.isDen) result += Coulomb(x.field, y.field, coulomb);
+            if (x.isDen) result += Coulomb(y.field, z.field, coulomb, coulombCache);
+            if (y.isDen) result += Coulomb(z.field, x.field, coulomb, coulombCache);
+            if (z.isDen) result += Coulomb(x.field, y.field, coulomb, coulombCache);
             return result;
         }
 

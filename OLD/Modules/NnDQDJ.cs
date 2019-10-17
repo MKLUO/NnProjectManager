@@ -302,9 +302,11 @@ namespace NnManager {
             var cHamZT = new Complex[ztb.Count(), ztb.Count()];
 
             // options.TryGetValue("enableFTDict", out string? enableFTDicts);
-            Dictionary<Complex[, , ], Complex[, , ]> ? ftDict = null;
+            // Dictionary<Complex[, , ], Complex[, , ]> ? ftDict = null;
             // if (enableFTDicts == "yes")
             //     ftDict = new Dictionary<Complex[, , ], Complex[, , ]>();
+
+            var coulombCache = new Dictionary<(ScalarField, ScalarField), Complex>();
 
             foreach (var(name, ham, cHam, basis, selCoef, denSet1, denSet2, spb1, spb2) in new [] {
                     ("AP", hamAP, cHamAP, apb, 0.0, denUp, denDown, uWF, dWF),
@@ -322,13 +324,13 @@ namespace NnManager {
                         var den1 = denSet1[basis[i].i, basis[j].i]; // xx
                         var den2 = denSet2[basis[i].j, basis[j].j]; // yy
 
-                        cHam[i, j] = ScalarField.Coulomb(den1, den2, coulomb, ftDict);
+                        cHam[i, j] = ScalarField.Coulomb(den1, den2, coulomb, coulombCache);
 
                         //// NOTE: In parallel spin states, conjugate term of orbital WF also contributes to ham.
                         if (selCoef != 0.0) {
                             var den3 = denSet1[basis[i].i, basis[j].j]; // xy
                             var den4 = denSet2[basis[i].j, basis[j].i]; // yx
-                            cHam[i, j] += selCoef * ScalarField.Coulomb(den3, den4, coulomb, ftDict);
+                            cHam[i, j] += selCoef * ScalarField.Coulomb(den3, den4, coulomb, coulombCache);
                         }
 
                         var eigenEnergy = 0.0;
@@ -458,16 +460,16 @@ namespace NnManager {
 
                             if (basis == dddb)
                                 ham[i, j] = 
-                                    +1.0 * ScalarField.CircularCoulomb(den[0,0], den[1,1], den[2,2], coulomb) +
-                                    +2.0 * ScalarField.CircularCoulomb(den[0,1], den[1,2], den[2,0], coulomb).Real +
-                                    -1.0 * ScalarField.CircularCoulomb(den[0,0], den[1,2], den[2,1], coulomb) +
-                                    -1.0 * ScalarField.CircularCoulomb(den[1,1], den[2,0], den[0,2], coulomb) +
-                                    -1.0 * ScalarField.CircularCoulomb(den[2,2], den[0,1], den[1,0], coulomb);
+                                    +1.0 * ScalarField.CircularCoulomb(den[0,0], den[1,1], den[2,2], coulomb, coulombCache) +
+                                    +2.0 * ScalarField.CircularCoulomb(den[0,1], den[1,2], den[2,0], coulomb, coulombCache).Real +
+                                    -1.0 * ScalarField.CircularCoulomb(den[0,0], den[1,2], den[2,1], coulomb, coulombCache) +
+                                    -1.0 * ScalarField.CircularCoulomb(den[1,1], den[2,0], den[0,2], coulomb, coulombCache) +
+                                    -1.0 * ScalarField.CircularCoulomb(den[2,2], den[0,1], den[1,0], coulomb, coulombCache);
                             //TODO:
                             else
                                 ham[i, j] = 
-                                    +1.0 * ScalarField.CircularCoulomb(den[0,0], den[1,1], den[2,2], coulomb) +
-                                    -1.0 * ScalarField.CircularCoulomb(den[0,0], den[1,2], den[2,1], coulomb);
+                                    +1.0 * ScalarField.CircularCoulomb(den[0,0], den[1,1], den[2,2], coulomb, coulombCache) +
+                                    -1.0 * ScalarField.CircularCoulomb(den[0,0], den[1,2], den[2,1], coulomb, coulombCache);
 
                             cHam[i, j] = ham[i, j];
                             cHam[j, i] = 

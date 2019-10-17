@@ -44,9 +44,7 @@ namespace NnManager {
              */
 
             /// NOTE: Evaluate coulomb kernel (from a ref. WF)
-
-            /// 
-
+            
             return true;
         }
     }    
