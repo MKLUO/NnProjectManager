@@ -179,9 +179,15 @@ namespace NnManager {
                 }
             }
             // }
+           
+            var uWF = lUWF.Concat(rUWF).ToList();
+            var dWF = lDWF.Concat(rDWF).ToList();
+
+            var orderU = orderLU + orderRU;
+            var orderD = orderLD + orderRD;
 
             ////// NOTE: Calculate Coulomb Kernel
-            var coulomb = NnAgent.CoulombKernel(lDWF[0].wf);
+            var coulomb = NnAgent.CoulombKernel(dWF[0].wf);
 
             //// NOTE: Substrate out extra Hartree energy included in NN mean-field calculation
 
@@ -220,12 +226,6 @@ namespace NnManager {
                 coulomb repulsion of parallel (P) and antiparallel (AP) spin states are decoupled (selection rule), and can be calculated separately.
             */
             SetStatus("Assembling WF ...");
-
-            var uWF = lUWF.Concat(rUWF).ToList();
-            var dWF = lDWF.Concat(rDWF).ToList();
-
-            var orderU = orderLU + orderRU;
-            var orderD = orderLD + orderRD;
 
             var denUp = new ScalarField[orderU, orderU];
             var denDown = new ScalarField[orderD, orderD];
@@ -362,13 +362,6 @@ namespace NnManager {
 
             options.TryGetValue("3particle", out string? do3Particle);
 
-            double? p3GSE = null;
-            // var apb3 = new List < (int i, int j, int k, string name) > ();
-            // for (int i = 0; i < order * 2; i++)
-            //     for (int j = 0; j < order * 2; j++)
-            //         for (int k = j + 1; k < order * 2; k++)
-            //             apb3.Add((i, j, k, $""));
-
             var uddb = new List < (int i, int j, int k, string name) > ();
             for (int i = 0; i < orderU; i++)
                 for (int j = 0; j < orderD; j++)
@@ -380,12 +373,6 @@ namespace NnManager {
                 for (int j = 0; j < orderU; j++)
                     for (int k = j + 1; k < orderU; k++)
                         duub.Add((i, j, k, $"({BasisIdxToTag(i, orderLD)},{BasisIdxToTag(j, orderLU)},{BasisIdxToTag(k, orderLU)})"));
-
-            // var pb3 = new List < (int i, int j, int k, string name) > ();
-            // for (int i = 0; i < order * 2; i++)
-            //     for (int j = i + 1; j < order * 2; j++)
-            //         for (int k = j + 1; k < order * 2; k++)
-            //             pb3.Add((i, j, k, $""));
 
             var dddb = new List < (int i, int j, int k, string name) > ();
             for (int i = 0; i < orderD; i++)
@@ -411,89 +398,68 @@ namespace NnManager {
                         ("UDD", hamUDD, cHamUDD, uddb, denUp, denDown, denDown, uWF, dWF, dWF),
                         // ("DUU", hamDUU, cHamDUU, duub, denDown, denUp, denUp, dWF, uWF, uWF),
                     }) {
-                    for (int i = 0; i < basis.Count(); i++)
-                        for (int j = i; j < basis.Count(); j++) {
+                    if (name == "DDD")
+                        for (int i = 0; i < basis.Count(); i++) {
+                            SetStatus($"Evaluating {name}({i},...) ...");
+                            for (int j = i; j < basis.Count(); j++) {
 
-                            SetStatus($"Evaluating {name}({i},{j}) ...");
+                                var den = new (ScalarField field, bool isDen)[3,3];
+                                den[0,0] = (denSet1[basis[i].i, basis[j].i], basis[i].i == basis[j].i);
+                                den[1,1] = (denSet2[basis[i].j, basis[j].j], basis[i].j == basis[j].j);
+                                den[2,2] = (denSet3[basis[i].k, basis[j].k], basis[i].k == basis[j].k);
+                                den[0,1] = (denSet1[basis[i].i, basis[j].j], basis[i].i == basis[j].j);
+                                den[1,2] = (denSet2[basis[i].j, basis[j].k], basis[i].j == basis[j].k);
+                                den[2,0] = (denSet3[basis[i].k, basis[j].i], basis[i].k == basis[j].i);
+                                den[0,2] = (denSet1[basis[i].i, basis[j].k], basis[i].i == basis[j].k);
+                                den[1,0] = (denSet2[basis[i].j, basis[j].i], basis[i].j == basis[j].i);
+                                den[2,1] = (denSet3[basis[i].k, basis[j].j], basis[i].k == basis[j].j);
 
-                            var den = new (ScalarField field, bool isDen)[3,3];
-
-                            foreach (int ci in Enumerable.Range(0, 3))
-                            foreach (int cj in Enumerable.Range(0, 3)) {
-                                var denSet = ci switch {
-                                    0 => denSet1,
-                                    1 => denSet2,
-                                    2 => denSet3,
-                                    _ => throw new Exception(),
-                                };
-
-                                var basisI = ci switch {
-                                    0 => basis[i].i,
-                                    1 => basis[i].j,
-                                    2 => basis[i].k,
-                                    _ => throw new Exception(),
-                                };
-
-                                var basisJ = cj switch {
-                                    0 => basis[j].i,
-                                    1 => basis[j].j,
-                                    2 => basis[j].k,
-                                    _ => throw new Exception(),
-                                };
-
-                                if ((basisI >= denSet.GetLength(0)) || (basisJ >= denSet.GetLength(1)))
-                                    continue;
-                                den[ci,cj] = (denSet[basisI, basisJ], basisI == basisJ);
-                            }
-
-                            // var den11 = denSet1[basis[i].i, basis[j].i];
-                            // var den22 = denSet2[basis[i].j, basis[j].j];
-                            // var den33 = denSet3[basis[i].k, basis[j].k];
-
-                            // var den12 = denSet1[basis[i].i, basis[j].j];
-                            // var den23 = denSet2[basis[i].j, basis[j].k];
-                            // var den31 = denSet3[basis[i].k, basis[j].i];
-
-                            // var den13 = denSet1[basis[i].i, basis[j].k];
-                            // var den21 = denSet2[basis[i].j, basis[j].i];
-                            // var den32 = denSet3[basis[i].k, basis[j].j];
-
-                            if (basis == dddb)
                                 ham[i, j] = 
                                     +1.0 * ScalarField.CircularCoulomb(den[0,0], den[1,1], den[2,2], coulomb, coulombCache) +
                                     +2.0 * ScalarField.CircularCoulomb(den[0,1], den[1,2], den[2,0], coulomb, coulombCache).Real +
                                     -1.0 * ScalarField.CircularCoulomb(den[0,0], den[1,2], den[2,1], coulomb, coulombCache) +
                                     -1.0 * ScalarField.CircularCoulomb(den[1,1], den[2,0], den[0,2], coulomb, coulombCache) +
                                     -1.0 * ScalarField.CircularCoulomb(den[2,2], den[0,1], den[1,0], coulomb, coulombCache);
-                            //TODO:
-                            else
+
+                                cHam[i, j] = ham[i, j];
+                                cHam[j, i] = 
+                                    new Complex(
+                                        ham[i, j].Real, -ham[i, j].Imaginary
+                                    );
+                                ham[j, i] = cHam[j, i];
+                            }
+                        }
+                    else if (name == "UDD")
+                        for (int i = 0; i < basis.Count(); i++) {
+                            SetStatus($"Evaluating {name}({i},...) ...");
+                            for (int j = i; j < basis.Count(); j++) {
+
+                                var den = new (ScalarField field, bool isDen)[3,3];
+                                
+                                den[0,0] = (denSet1[basis[i].i, basis[j].i], basis[i].i == basis[j].i);
+                                den[1,1] = (denSet2[basis[i].j, basis[j].j], basis[i].j == basis[j].j);
+                                den[2,2] = (denSet3[basis[i].k, basis[j].k], basis[i].k == basis[j].k);
+                                den[1,2] = (denSet2[basis[i].j, basis[j].k], basis[i].j == basis[j].k);
+                                den[2,1] = (denSet3[basis[i].k, basis[j].j], basis[i].k == basis[j].j);
+
                                 ham[i, j] = 
                                     +1.0 * ScalarField.CircularCoulomb(den[0,0], den[1,1], den[2,2], coulomb, coulombCache) +
                                     -1.0 * ScalarField.CircularCoulomb(den[0,0], den[1,2], den[2,1], coulomb, coulombCache);
 
-                            cHam[i, j] = ham[i, j];
-                            cHam[j, i] = 
-                                new Complex(
-                                    ham[i, j].Real, -ham[i, j].Imaginary
-                                );
-
-                            if (i == j)
-                                ham[i, j] += spb1[basis[i].i].energy + spb2[basis[i].j].energy + spb3[basis[i].k].energy;                                
-
-                            //// Hamiltonians are Hermitian
-                            if (i == j)
-                                ham[i, j] = ham[i, j].Real;
-                            ham[j, i] =
-                                new Complex(
-                                    ham[i, j].Real, -ham[i, j].Imaginary
-                                );
+                                cHam[i, j] = ham[i, j];
+                                cHam[j, i] = 
+                                    new Complex(
+                                        ham[i, j].Real, -ham[i, j].Imaginary
+                                    );
+                                ham[j, i] = cHam[j, i];
+                            }
                         }
-                }
-
-                p3GSE = new [] {
-                    Eigen.EVD(hamDDD, 1) [0].val,
-                        Eigen.EVD(hamUDD, 1) [0].val
-                }.Min();
+                    for (int i = 0; i < basis.Count(); i++) {
+                        ham[i, i] += spb1[basis[i].i].energy + spb2[basis[i].j].energy + spb3[basis[i].k].energy;  
+                        //// Hamiltonians are Hermitian
+                        ham[i, i] = ham[i, i].Real;
+                    }
+                }                
             }
 
             // FIXME: For debug
@@ -516,6 +482,9 @@ namespace NnManager {
             var apVecs = apEigen.Select(x => x.vec).ToList();
             var ooVecs = ooEigen.Select(x => x.vec).ToList();
             var ztVecs = ztEigen.Select(x => x.vec).ToList();
+
+            var dddEigen = Eigen.EVD(hamDDD, 0);
+            var uddEigen = Eigen.EVD(hamUDD, 0);
 
             //// NOTE: A more representative AP Hamiltonian (w/ (1,1) (2,0)/(0,2) diag. separately).
             //// (1) Construct transformation matrices.
@@ -594,17 +563,31 @@ namespace NnManager {
                 dd0Info = new StringBuilder($"[--#0]: "),                
                 oo0Info = new StringBuilder($"[11#0]: "),
                 oo1Info = new StringBuilder($"[11#1]: "),
-                zt0Info = new StringBuilder($"[02#0]: ");
-            foreach (var (infoBuilder, eig, basis, spb1, spb2) in new [] {
-                    (ap0Info, apEigen[0], apb, uWF, dWF),
-                    (ap1Info, apEigen[1], apb, uWF, dWF),
-                    (uu0Info, uuEigen[0], uub, uWF, uWF),
-                    (dd0Info, ddEigen[0], ddb, dWF, dWF),
+                zt0Info = new StringBuilder($"[02#0]: "),
+                ddd0Info = new StringBuilder($"[---#0]: "),
+                udd0Info = new StringBuilder($"[+--#0]: "),
+                udd1Info = new StringBuilder($"[+--#1]: ");
+            
+            var infoList = new [] {
+                (ap0Info, apEigen[0], apb.Select(t => t.name), uWF, dWF),
+                (ap1Info, apEigen[1], apb.Select(t => t.name), uWF, dWF),
+                (uu0Info, uuEigen[0], uub.Select(t => t.name), uWF, uWF),
+                (dd0Info, ddEigen[0], ddb.Select(t => t.name), dWF, dWF),
+                (zt0Info, ztEigen[0], ztb.Select(t => t.name), uWF, dWF)
+            }.ToList();
+            if (ooEigen.Count >= 2) {
+                infoList.Add((oo0Info, ooEigen[0], oob.Select(t => t.name), uWF, dWF));
+                infoList.Add((oo1Info, ooEigen[1], oob.Select(t => t.name), uWF, dWF));
+            }
 
-                    (oo0Info, ooEigen[0], oob, uWF, dWF),
-                    (oo1Info, ooEigen[1], oob, uWF, dWF),
-                    (zt0Info, ztEigen[0], ztb, uWF, dWF)
-                }) {
+            if (do3Particle == "yes") {
+                infoList.Add((ddd0Info, dddEigen[0], dddb.Select(t => t.name), dWF, dWF));
+                infoList.Add((udd0Info, uddEigen[0], uddb.Select(t => t.name), dWF, dWF));
+                infoList.Add((udd1Info, uddEigen[1], uddb.Select(t => t.name), dWF, dWF));           
+            }
+
+            // foreach (var (infoBuilder, eig, basis, spb1, spb2) in infoList) {
+            foreach (var (infoBuilder, eig, basisName, _, _) in infoList) {
                 var energy = eig.val;
 
                 var compList = new List < (int index, Complex occup) > ();
@@ -612,37 +595,20 @@ namespace NnManager {
                     compList.Add((i, eig.vec[i]));
                 compList = compList.OrderByDescending(x => x.occup.Magnitude).ToList();
 
-                var leadPair = basis[compList[0].index];
-                var origEnergy = spb1[leadPair.i].energy + spb2[leadPair.j].energy;
+                // var leadPair = basis[compList[0].index];
+                // var origEnergy = spb1[leadPair.i].energy + spb2[leadPair.j].energy;
 
-                var energyInfo = $"{energy.ToString("E04")} ({origEnergy.ToString("E04")}) (eV)";
+                // var energyInfo = $"{energy.ToString("E04")} ({origEnergy.ToString("E04")}) (eV)";
+                var energyInfo = $"{energy.ToString("E04")} (eV)";
                 string compInfo = "    ";
                 foreach (var comp in compList) {
                     var occup = comp.occup.Magnitude * comp.occup.Magnitude;
                     if (occup > 0.003) {
-                        compInfo += $"{basis[comp.index].name}:{occup.ToString("0.000")} ";
+                        compInfo += $"{basisName.ToList()[comp.index]}:{occup.ToString("0.000")} ";
                     }
                 }
 
                 infoBuilder.Append(energyInfo + "\n" + compInfo);
-
-                // if (basis == apb) {
-                    // if ((leadPair.i, leadPair.j) == (0, order))
-                    //     udInfo = $"[1, 0]: " + energyInfo + "\n" + compInfo;
-                    // if ((leadPair.i, leadPair.j) == (order, 0))
-                    //     duInfo = $"[0, 1]: " + energyInfo + "\n" + compInfo;
-                // if (eig == apEigen[0])
-                //     udInfo = $"[1, 0]: " + energyInfo + "\n" + compInfo;
-                // if (eig == apEigen[1])
-                //     duInfo = $"[0, 1]: " + energyInfo + "\n" + compInfo;
-                // }
-
-                // if (basis == pb) {
-                // if (eig == uuEigen[0])
-                //     uuInfo = $"[1, 1]: " + energyInfo + "\n" + compInfo;
-                // if (eig == ddEigen[0])
-                //     ddInfo = $"[0, 0]: " + energyInfo + "\n" + compInfo;
-                // }
             }
 
             /// NOTE: Pick up lowest 3 energy in AP
@@ -657,6 +623,7 @@ namespace NnManager {
             double p0GSE = 0.0;
             double p1GSE = lDWF.Concat(lUWF).Concat(rDWF).Concat(rUWF).Select(x => x.energy).Min();
             double p2GSE = apEigen.Concat(uuEigen).Concat(ddEigen).Select(x => x.val).Min();
+            double p3GSE = Math.Min(dddEigen[0].val, uddEigen[0].val);
 
             string ensembleGSInfo;
             if (p3GSE != null) {
@@ -703,14 +670,17 @@ namespace NnManager {
                     $" {u00} {u01} {u10} {u11}");
             }
 
+            // string p3GSEInfo = 
+            //     $"\np3GSE (udd, ddd): {uddGSE} {dddGSE}\n ";
+
             verbalReport +=
                 uu0Info + "\n" +
-                dd0Info + "\n" + "\n" +
+                dd0Info + "\n\n" +
                 zt0Info + "\n" +
                 oo1Info + "\n" +
-                oo0Info + "\n" + "\n" +
+                oo0Info + "\n\n" +
                 ap1Info + "\n" +
-                ap0Info + "\n" + "\n" +
+                ap0Info + "\n\n" +
 
                 ensembleGSInfo +
                 // apGSinfo + 
@@ -719,7 +689,9 @@ namespace NnManager {
                 hamAPdiagInfo +
                 tunnelingInfo +
                 repulsionInfoBuilder + 
-                cRepulsionInfoBuilder;
+                cRepulsionInfoBuilder + 
+
+                "\n\n" + ddd0Info + "\n" + udd0Info + "\n" + udd1Info;
 
             File.WriteAllText(NnDQDJResultPath, $"\n{J}");
             File.WriteAllText(NnDQDJReportPath, verbalReport);

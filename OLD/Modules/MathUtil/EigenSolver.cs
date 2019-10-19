@@ -52,8 +52,11 @@ namespace NnManager {
             var dimY = input.GetLength(1);
 
             if (dim != dimY) return new List<(Complex[] vec, double val)>();
+            if (dim == 0) return new List<(Complex[] vec, double val)>();
 
             evNum = (evNum == 0) ? dim : evNum;
+
+            if (evNum == 0) return new List<(Complex[] vec, double val)>();
 
             var w = new double[0];
             var z = new alglib.complex[0,0];
