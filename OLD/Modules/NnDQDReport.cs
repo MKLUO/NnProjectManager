@@ -281,25 +281,39 @@ namespace NnManager {
             int counter = 1;
             Dictionary<int, double> result = new Dictionary<int, double>();
             while (true) {                
-                var entriesDown = NnAgent.NnAmplFileEntry(NnAgent.BandType.X1, counter, NnAgent.Spin.Down);
-                var entriesUp = NnAgent.NnAmplFileEntry(NnAgent.BandType.X1, counter, NnAgent.Spin.Up);
-                (RPath? dataImagD, RPath? coordImagD, _, _) = NnAgent.GetCoordAndDat(NNPath, entriesDown.imag);
-                (RPath? dataRealD, RPath? coordRealD, _, _) = NnAgent.GetCoordAndDat(NNPath, entriesDown.real);
-                (RPath? dataImagU, RPath? coordImagU, _, _) = NnAgent.GetCoordAndDat(NNPath, entriesUp.imag);
-                (RPath? dataRealU, RPath? coordRealU, _, _) = NnAgent.GetCoordAndDat(NNPath, entriesUp.real);
-                if ((dataImagD?.Content == null) || (coordImagD?.Content == null) ||
-                    (dataImagU?.Content == null) || (coordImagU?.Content == null) ||
-                    (dataRealD?.Content == null) || (coordRealD?.Content == null) ||
-                    (dataRealU?.Content == null) || (coordRealU?.Content == null))
+                // var entriesDown = NnAgent.NnAmplFileEntry(NnAgent.BandType.X1, counter, NnAgent.Spin.Down);
+                // var entriesUp = NnAgent.NnAmplFileEntry(NnAgent.BandType.X1, counter, NnAgent.Spin.Up);
+                // (RPath? dataImagD, RPath? coordImagD, _, _) = NnAgent.GetCoordAndDat(NNPath, entriesDown.imag);
+                // (RPath? dataRealD, RPath? coordRealD, _, _) = NnAgent.GetCoordAndDat(NNPath, entriesDown.real);
+                // (RPath? dataImagU, RPath? coordImagU, _, _) = NnAgent.GetCoordAndDat(NNPath, entriesUp.imag);
+                // (RPath? dataRealU, RPath? coordRealU, _, _) = NnAgent.GetCoordAndDat(NNPath, entriesUp.real);
+                // if ((dataImagD?.Content == null) || (coordImagD?.Content == null) ||
+                //     (dataImagU?.Content == null) || (coordImagU?.Content == null) ||
+                //     (dataRealD?.Content == null) || (coordRealD?.Content == null) ||
+                //     (dataRealU?.Content == null) || (coordRealU?.Content == null))
+                //     break;
+
+                // ScalarField fieldImagD = ScalarField.FromNnDatAndCoord(dataImagD.Content, coordImagD.Content);  
+                // ScalarField fieldImagU = ScalarField.FromNnDatAndCoord(dataImagU.Content, coordImagU.Content);  
+                // ScalarField fieldRealD = ScalarField.FromNnDatAndCoord(dataRealD.Content, coordRealD.Content);  
+                // ScalarField fieldRealU = ScalarField.FromNnDatAndCoord(dataRealU.Content, coordRealU.Content);  
+
+                // var normU = fieldImagU.Norm() + fieldRealU.Norm();
+                // var normD = fieldImagD.Norm() + fieldRealD.Norm();
+
+                var entriesDown = NnAgent.NnProbFileEntry(NnAgent.BandType.X1, counter, NnAgent.Spin.Down);
+                var entriesUp = NnAgent.NnProbFileEntry(NnAgent.BandType.X1, counter, NnAgent.Spin.Up);
+                (RPath? dataD, RPath? coordD, _, _) = NnAgent.GetCoordAndDat(NNPath, entriesDown);
+                (RPath? dataU, RPath? coordU, _, _) = NnAgent.GetCoordAndDat(NNPath, entriesUp);
+                if ((dataD?.Content == null) || (coordD?.Content == null) ||
+                    (dataU?.Content == null) || (coordU?.Content == null))
                     break;
 
-                ScalarField fieldImagD = ScalarField.FromNnDatAndCoord(dataImagD.Content, coordImagD.Content);  
-                ScalarField fieldImagU = ScalarField.FromNnDatAndCoord(dataImagU.Content, coordImagU.Content);  
-                ScalarField fieldRealD = ScalarField.FromNnDatAndCoord(dataRealD.Content, coordRealD.Content);  
-                ScalarField fieldRealU = ScalarField.FromNnDatAndCoord(dataRealU.Content, coordRealU.Content);  
+                ScalarField fieldD = ScalarField.FromNnDatAndCoord(dataD.Content, coordD.Content);  
+                ScalarField fieldU = ScalarField.FromNnDatAndCoord(dataU.Content, coordU.Content);  
 
-                var normU = fieldImagU.Norm() + fieldRealU.Norm();
-                var normD = fieldImagD.Norm() + fieldRealD.Norm();
+                var normU = fieldU.Sum().Real;
+                var normD = fieldD.Sum().Real;
 
                 result[counter] = normU / (normU + normD);
                 counter++;

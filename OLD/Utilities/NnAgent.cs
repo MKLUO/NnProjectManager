@@ -158,6 +158,14 @@ namespace NnManager {
         public static string NnProbFileEntry(BandType band, int id) =>
             $"wf_probability_quantum_region_{band.ToString()}_0000_{id.ToString("0000")}";
 
+        public static string NnProbFileEntry(BandType band, int id, Spin spin) {
+            switch (spin) {
+                case Spin.Down:
+                    return $"wf_probability_quantum_region_{band.ToString()}_2_0000_{id.ToString("0000")}";
+                default:
+                    return $"wf_probability_quantum_region_{band.ToString()}_1_0000_{id.ToString("0000")}";
+            }
+        }
 
         // FIXME: HACKING HERE! Should be generalized in future.
 
