@@ -166,6 +166,8 @@ namespace NnManager {
                         wfImagData.Content, wfImagCoord.Content
                     ).Truncate((x0, y0, z0), (x1, y1, z1));
 
+                    wf = wf * Math.Pow(1.0 / wf.Norm(), 0.5);
+
                     // Truncate WFs
                     wfCollection.Add((
                         spec[i].Energy,
