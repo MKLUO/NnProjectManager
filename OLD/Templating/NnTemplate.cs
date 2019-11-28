@@ -23,7 +23,7 @@ namespace NnManager {
     public class NnTemplate {        
         public string Name { get; }
         public NnType Type { get; }
-        public RPath FSPath { get; }
+        public RPath? FSPath { get; }
         List<Element> Elements { get; }
         public ImmutableDictionary<string, string?> Variables { get; }
         public ImmutableDictionary<string, string> DerivedVariables { get; }
@@ -74,7 +74,7 @@ namespace NnManager {
         NnTemplate(
             string name,
             NnType type,
-            RPath path,
+            RPath? path,
             List<Element> elements,
             ImmutableDictionary<string, string?> variables,
             ImmutableDictionary<string, string> derivedVariables
@@ -109,6 +109,8 @@ namespace NnManager {
         }
 
         public void Save(RPath? path = null) {
+            if ((FSPath ?? path) == null)
+                return;
             Util.SerializeToFile(
                 new SaveData(this),
                 path == null ?
@@ -143,7 +145,7 @@ namespace NnManager {
         public static NnTemplate? NewTemplate(
             string name,
             string content,
-            RPath path
+            RPath? path = null
         ) {
             List<Element> elements = new List<Element>();
 
