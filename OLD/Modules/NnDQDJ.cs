@@ -510,13 +510,16 @@ namespace NnManager {
             var ud_du_zt_EigMat = new Complex[apb.Count, apb.Count];
             var ooztToApMat = new Complex[apb.Count, apb.Count];
 
+            var uuEigMat = new Complex[uub.Count, uub.Count];
+            var ddEigMat = new Complex[ddb.Count, ddb.Count];
+
             // E: Fill in the eigenvectors.
             for (int i = 0; i < udb.Count; ++i)
                 for (int j = 0; j < udb.Count; ++j)
                     ud_du_zt_EigMat[j, i] = udEigen[i].vec[j];
             for (int i = 0; i < dub.Count; ++i)
                 for (int j = 0; j < dub.Count; ++j)
-                    ud_du_zt_EigMat[j + udb.Count, i + udb.Count] = udEigen[i].vec[j];
+                    ud_du_zt_EigMat[j + udb.Count, i + udb.Count] = duEigen[i].vec[j];
             for (int i = 0; i < oob.Count; ++i)
                 for (int j = 0; j < oob.Count; ++j)
                     ooztEigMat[j, i] = ooEigen[i].vec[j];
@@ -526,6 +529,14 @@ namespace NnManager {
                     ooztEigMat[j + oob.Count, i + oob.Count] = ztEigen[i].vec[j];
                     ud_du_zt_EigMat[j + oob.Count, i + oob.Count] = ztEigen[i].vec[j];
                 }
+
+            // E-P: Eigenvectors of P-states
+            for (int i = 0; i < uub.Count; ++i)
+                for (int j = 0; j < uub.Count; ++j)
+                    uuEigMat[j, i] = uuEigen[i].vec[j];
+            for (int i = 0; i < ddb.Count; ++i)
+                for (int j = 0; j < ddb.Count; ++j)
+                    ddEigMat[j, i] = ddEigen[i].vec[j];
 
             // P: Permutation (from oo+zt => ap)        
             for (int i = 0; i < orderLU; ++i)
@@ -548,6 +559,7 @@ namespace NnManager {
                     ooztToApMat[
                         j + i * orderD + orderLU * orderD + orderLD,
                         j + i * orderRD + orderLU * orderRD + orderRU * orderLD + orderLU * orderLD] = 1.0;
+
             // if (i < apb.Count / 2)
             //     ooztToApMat[i + apb.Count / 4, i] = 1.0;
             // else if (i < apb.Count / 4 * 3)
@@ -577,6 +589,14 @@ namespace NnManager {
                 pe2A,
                 Eigen.Multiply(cHamAP, pe2));
 
+            var cHamUUdiag = Eigen.Multiply(
+                Eigen.Adjoint(uuEigMat),
+                Eigen.Multiply(cHamUU, uuEigMat));
+
+            var cHamDDdiag = Eigen.Multiply(
+                Eigen.Adjoint(ddEigMat),
+                Eigen.Multiply(cHamDD, ddEigMat));
+
             //// NOTE: Create Reports (Verbal & NXY data)
             SetStatus("Writing Report ...");
             string verbalReport = "";
@@ -592,10 +612,10 @@ namespace NnManager {
                     // apCHamReport += Math.Log10(cHamAPdiag[i, j].Magnitude).ToString("e1") + "\t\t";
                     // udduHamReport += Math.Log10(hamAP2diag[i, j].Magnitude).ToString("e1") + "\t\t";
                     // udduCHamReport += Math.Log10(cHamAP2diag[i, j].Magnitude).ToString("e1") + "\t\t";
-                    apHamReport += hamAPdiag[i, j].Magnitude.ToString("e1") + "\t\t";
-                    apCHamReport += cHamAPdiag[i, j].Magnitude.ToString("e1") + "\t\t";
-                    udduHamReport += hamAP2diag[i, j].Magnitude.ToString("e1") + "\t\t";
-                    udduCHamReport += cHamAP2diag[i, j].Magnitude.ToString("e1") + "\t\t";
+                    apHamReport += hamAPdiag[i, j].Magnitude.ToString("e3") + "\t";
+                    apCHamReport += cHamAPdiag[i, j].Magnitude.ToString("e3") + "\t";
+                    udduHamReport += hamAP2diag[i, j].Magnitude.ToString("e3") + "\t";
+                    udduCHamReport += cHamAP2diag[i, j].Magnitude.ToString("e3") + "\t";
                 }
                 apHamReport += "\r\n";
                 apCHamReport += "\r\n";
@@ -612,6 +632,21 @@ namespace NnManager {
             File.WriteAllText(NnDQDJApCHamPath, apCHamReport);
             File.WriteAllText(NnDQDJUdduHamPath, udduHamReport);
             File.WriteAllText(NnDQDJUdduCHamPath, udduCHamReport);
+
+            string antiBondingC = "";
+            foreach (var i in Enumerable.Range(0, apb.Count)) {
+                antiBondingC += cHamAP[i, i] + "\r\n";
+            }
+            antiBondingC += "\r\n";
+            foreach (var i in Enumerable.Range(0, uub.Count)) {
+                antiBondingC += cHamUU[i, i] + "\r\n";
+            }
+            antiBondingC += "\r\n";
+            foreach (var i in Enumerable.Range(0, ddb.Count)) {
+                antiBondingC += cHamDD[i, i] + "\r\n";
+            }
+            RPath NnDQDJABCPath = NnDQDJPath.SubPath($"ABC.txt");
+            File.WriteAllText(NnDQDJABCPath, antiBondingC);
 
             ////// NOTE: Corrected energy
 
