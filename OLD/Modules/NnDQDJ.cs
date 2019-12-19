@@ -8,8 +8,6 @@ using System.Text;
 // using System.Text.RegularExpressions;
 using System.Threading;
 
-#nullable enable
-
 namespace NnManager {
     using RPath = Util.RestrictedPath;
     // using Dim = ScalarField.Dim;
@@ -54,7 +52,7 @@ namespace NnManager {
                 return new List<double>();
 
             string result = NnDQDJGetResult();
-            string[] energies = { };
+            string[] energies = {};
 
             foreach (var line in result.Split('\n'))
                 if (line.Contains("Ensemble"))
@@ -149,9 +147,9 @@ namespace NnManager {
             // for (int i = 0; i < order; i++) {
             foreach ((var wfCollection, var spec, var spin, var ord) in new [] {
                     (lDWF, specLD, NnAgent.Spin.Down, orderLD),
-                    (lUWF, specLU, NnAgent.Spin.Up,   orderLU),
+                    (lUWF, specLU, NnAgent.Spin.Up, orderLU),
                     (rDWF, specRD, NnAgent.Spin.Down, orderRD),
-                    (rUWF, specRU, NnAgent.Spin.Up,   orderRU)
+                    (rUWF, specRU, NnAgent.Spin.Up, orderRU)
                 }) {
                 for (int i = 0; i < ord; i++) {
                     var wfs = NnAgent.NnAmplFileEntry(NnAgent.BandType.X1, spec[i].Id, spin);
@@ -181,7 +179,7 @@ namespace NnManager {
                 }
             }
             // }
-           
+
             var uWF = lUWF.Concat(rUWF).ToList();
             var dWF = lDWF.Concat(rDWF).ToList();
 
@@ -272,12 +270,19 @@ namespace NnManager {
 
             // NOTE: (1, 1) (oob) / (2, 0) (ztb) subspaces of AP
             var oob = new List < (int i, int j, string name) > ();
+            // NOTE: (+, -) (udb) / (-, +) (dub) subspaces of (1, 1) AP
+            var udb = new List < (int i, int j, string name) > ();
+            var dub = new List < (int i, int j, string name) > ();
             for (int i = 0; i < orderLU; i++)
-                for (int j = orderLD; j < orderD; j++)
+                for (int j = orderLD; j < orderD; j++) {
                     oob.Add((i, j, $"({BasisIdxToTag(i, orderLU)},{BasisIdxToTag(j, orderLD)})"));
+                    udb.Add((i, j, $"({BasisIdxToTag(i, orderLU)},{BasisIdxToTag(j, orderLD)})"));
+                }
             for (int i = orderLU; i < orderU; i++)
-                for (int j = 0; j < orderLD; j++)
+                for (int j = 0; j < orderLD; j++) {
                     oob.Add((i, j, $"({BasisIdxToTag(i, orderLU)},{BasisIdxToTag(j, orderLD)})"));
+                    dub.Add((i, j, $"({BasisIdxToTag(i, orderLU)},{BasisIdxToTag(j, orderLD)})"));
+                }
             var ztb = new List < (int i, int j, string name) > ();
             for (int i = 0; i < orderLU; i++)
                 for (int j = 0; j < orderLD; j++)
@@ -296,6 +301,9 @@ namespace NnManager {
             var hamOO = new Complex[oob.Count(), oob.Count()];
             var hamZT = new Complex[ztb.Count(), ztb.Count()];
 
+            var hamUD = new Complex[udb.Count(), udb.Count()];
+            var hamDU = new Complex[dub.Count(), dub.Count()];
+
             var cHamAP = new Complex[apb.Count(), apb.Count()];
             var cHamUU = new Complex[uub.Count(), uub.Count()];
             var cHamDD = new Complex[ddb.Count(), ddb.Count()];
@@ -303,12 +311,16 @@ namespace NnManager {
             var cHamOO = new Complex[oob.Count(), oob.Count()];
             var cHamZT = new Complex[ztb.Count(), ztb.Count()];
 
+            var cHamUD = new Complex[udb.Count(), udb.Count()];
+            var cHamDU = new Complex[dub.Count(), dub.Count()];
+
             // options.TryGetValue("enableFTDict", out string? enableFTDicts);
             // Dictionary<Complex[, , ], Complex[, , ]> ? ftDict = null;
             // if (enableFTDicts == "yes")
             //     ftDict = new Dictionary<Complex[, , ], Complex[, , ]>();
 
-            var coulombCache = new Dictionary<(ScalarField, ScalarField), Complex>();
+            var coulombCache = new Dictionary < (ScalarField, ScalarField),
+                Complex > ();
 
             foreach (var(name, ham, cHam, basis, selCoef, denSet1, denSet2, spb1, spb2) in new [] {
                     ("AP", hamAP, cHamAP, apb, 0.0, denUp, denDown, uWF, dWF),
@@ -316,7 +328,10 @@ namespace NnManager {
                     ("DD", hamDD, cHamDD, ddb, -1.0, denDown, denDown, dWF, dWF),
 
                     ("OO", hamOO, cHamOO, oob, 0.0, denUp, denDown, uWF, dWF),
-                    ("ZT", hamZT, cHamZT, ztb, 0.0, denUp, denDown, uWF, dWF)
+                    ("ZT", hamZT, cHamZT, ztb, 0.0, denUp, denDown, uWF, dWF),
+
+                    ("UD", hamUD, cHamUD, udb, 0.0, denUp, denDown, uWF, dWF),
+                    ("DU", hamDU, cHamDU, dub, 0.0, denUp, denDown, uWF, dWF)
                 }) {
                 for (int i = 0; i < basis.Count(); i++)
                     for (int j = i; j < basis.Count(); j++) {
@@ -383,9 +398,9 @@ namespace NnManager {
                         dddb.Add((i, j, k, $"({BasisIdxToTag(i, orderLD)},{BasisIdxToTag(j, orderLD)},{BasisIdxToTag(k, orderLD)})"));
 
             // var hamUUU = new Complex[pb3.Count(), pb3.Count()];
-            var hamDDD  = new Complex[dddb.Count(), dddb.Count()];
-            var hamUDD  = new Complex[uddb.Count(), uddb.Count()];
-            var hamDUU  = new Complex[duub.Count(), duub.Count()];
+            var hamDDD = new Complex[dddb.Count(), dddb.Count()];
+            var hamUDD = new Complex[uddb.Count(), uddb.Count()];
+            var hamDUU = new Complex[duub.Count(), duub.Count()];
             var cHamDDD = new Complex[dddb.Count(), dddb.Count()];
             var cHamUDD = new Complex[uddb.Count(), uddb.Count()];
             var cHamDUU = new Complex[duub.Count(), duub.Count()];
@@ -405,26 +420,25 @@ namespace NnManager {
                             SetStatus($"Evaluating {name}({i},...) ...");
                             for (int j = i; j < basis.Count(); j++) {
 
-                                var den = new (ScalarField field, bool isDen)[3,3];
-                                den[0,0] = (denSet1[basis[i].i, basis[j].i], basis[i].i == basis[j].i);
-                                den[1,1] = (denSet2[basis[i].j, basis[j].j], basis[i].j == basis[j].j);
-                                den[2,2] = (denSet3[basis[i].k, basis[j].k], basis[i].k == basis[j].k);
-                                den[0,1] = (denSet1[basis[i].i, basis[j].j], basis[i].i == basis[j].j);
-                                den[1,2] = (denSet2[basis[i].j, basis[j].k], basis[i].j == basis[j].k);
-                                den[2,0] = (denSet3[basis[i].k, basis[j].i], basis[i].k == basis[j].i);
-                                den[0,2] = (denSet1[basis[i].i, basis[j].k], basis[i].i == basis[j].k);
-                                den[1,0] = (denSet2[basis[i].j, basis[j].i], basis[i].j == basis[j].i);
-                                den[2,1] = (denSet3[basis[i].k, basis[j].j], basis[i].k == basis[j].j);
+                                var den = new(ScalarField field, bool isDen) [3, 3];
+                                den[0, 0] = (denSet1[basis[i].i, basis[j].i], basis[i].i == basis[j].i);
+                                den[1, 1] = (denSet2[basis[i].j, basis[j].j], basis[i].j == basis[j].j);
+                                den[2, 2] = (denSet3[basis[i].k, basis[j].k], basis[i].k == basis[j].k);
+                                den[0, 1] = (denSet1[basis[i].i, basis[j].j], basis[i].i == basis[j].j);
+                                den[1, 2] = (denSet2[basis[i].j, basis[j].k], basis[i].j == basis[j].k);
+                                den[2, 0] = (denSet3[basis[i].k, basis[j].i], basis[i].k == basis[j].i);
+                                den[0, 2] = (denSet1[basis[i].i, basis[j].k], basis[i].i == basis[j].k);
+                                den[1, 0] = (denSet2[basis[i].j, basis[j].i], basis[i].j == basis[j].i);
+                                den[2, 1] = (denSet3[basis[i].k, basis[j].j], basis[i].k == basis[j].j);
 
-                                ham[i, j] = 
-                                    +1.0 * ScalarField.CircularCoulomb(den[0,0], den[1,1], den[2,2], coulomb, coulombCache) +
-                                    +2.0 * ScalarField.CircularCoulomb(den[0,1], den[1,2], den[2,0], coulomb, coulombCache).Real +
-                                    -1.0 * ScalarField.CircularCoulomb(den[0,0], den[1,2], den[2,1], coulomb, coulombCache) +
-                                    -1.0 * ScalarField.CircularCoulomb(den[1,1], den[2,0], den[0,2], coulomb, coulombCache) +
-                                    -1.0 * ScalarField.CircularCoulomb(den[2,2], den[0,1], den[1,0], coulomb, coulombCache);
+                                ham[i, j] = +1.0 * ScalarField.CircularCoulomb(den[0, 0], den[1, 1], den[2, 2], coulomb, coulombCache) +
+                                    +2.0 * ScalarField.CircularCoulomb(den[0, 1], den[1, 2], den[2, 0], coulomb, coulombCache).Real +
+                                    -1.0 * ScalarField.CircularCoulomb(den[0, 0], den[1, 2], den[2, 1], coulomb, coulombCache) +
+                                    -1.0 * ScalarField.CircularCoulomb(den[1, 1], den[2, 0], den[0, 2], coulomb, coulombCache) +
+                                    -1.0 * ScalarField.CircularCoulomb(den[2, 2], den[0, 1], den[1, 0], coulomb, coulombCache);
 
                                 cHam[i, j] = ham[i, j];
-                                cHam[j, i] = 
+                                cHam[j, i] =
                                     new Complex(
                                         ham[i, j].Real, -ham[i, j].Imaginary
                                     );
@@ -436,20 +450,19 @@ namespace NnManager {
                             SetStatus($"Evaluating {name}({i},...) ...");
                             for (int j = i; j < basis.Count(); j++) {
 
-                                var den = new (ScalarField field, bool isDen)[3,3];
-                                
-                                den[0,0] = (denSet1[basis[i].i, basis[j].i], basis[i].i == basis[j].i);
-                                den[1,1] = (denSet2[basis[i].j, basis[j].j], basis[i].j == basis[j].j);
-                                den[2,2] = (denSet3[basis[i].k, basis[j].k], basis[i].k == basis[j].k);
-                                den[1,2] = (denSet2[basis[i].j, basis[j].k], basis[i].j == basis[j].k);
-                                den[2,1] = (denSet3[basis[i].k, basis[j].j], basis[i].k == basis[j].j);
+                                var den = new(ScalarField field, bool isDen) [3, 3];
 
-                                ham[i, j] = 
-                                    +1.0 * ScalarField.CircularCoulomb(den[0,0], den[1,1], den[2,2], coulomb, coulombCache) +
-                                    -1.0 * ScalarField.CircularCoulomb(den[0,0], den[1,2], den[2,1], coulomb, coulombCache);
+                                den[0, 0] = (denSet1[basis[i].i, basis[j].i], basis[i].i == basis[j].i);
+                                den[1, 1] = (denSet2[basis[i].j, basis[j].j], basis[i].j == basis[j].j);
+                                den[2, 2] = (denSet3[basis[i].k, basis[j].k], basis[i].k == basis[j].k);
+                                den[1, 2] = (denSet2[basis[i].j, basis[j].k], basis[i].j == basis[j].k);
+                                den[2, 1] = (denSet3[basis[i].k, basis[j].j], basis[i].k == basis[j].j);
+
+                                ham[i, j] = +1.0 * ScalarField.CircularCoulomb(den[0, 0], den[1, 1], den[2, 2], coulomb, coulombCache) +
+                                    -1.0 * ScalarField.CircularCoulomb(den[0, 0], den[1, 2], den[2, 1], coulomb, coulombCache);
 
                                 cHam[i, j] = ham[i, j];
-                                cHam[j, i] = 
+                                cHam[j, i] =
                                     new Complex(
                                         ham[i, j].Real, -ham[i, j].Imaginary
                                     );
@@ -457,11 +470,11 @@ namespace NnManager {
                             }
                         }
                     for (int i = 0; i < basis.Count(); i++) {
-                        ham[i, i] += spb1[basis[i].i].energy + spb2[basis[i].j].energy + spb3[basis[i].k].energy;  
+                        ham[i, i] += spb1[basis[i].i].energy + spb2[basis[i].j].energy + spb3[basis[i].k].energy;
                         //// Hamiltonians are Hermitian
                         ham[i, i] = ham[i, i].Real;
                     }
-                }                
+                }
             }
 
             // FIXME: For debug
@@ -481,6 +494,9 @@ namespace NnManager {
             var ooEigen = Eigen.EVD(hamOO, oob.Count);
             var ztEigen = Eigen.EVD(hamZT, ztb.Count);
 
+            var udEigen = Eigen.EVD(hamUD, udb.Count);
+            var duEigen = Eigen.EVD(hamDU, dub.Count);
+
             var apVecs = apEigen.Select(x => x.vec).ToList();
             var ooVecs = ooEigen.Select(x => x.vec).ToList();
             var ztVecs = ztEigen.Select(x => x.vec).ToList();
@@ -491,57 +507,111 @@ namespace NnManager {
             //// NOTE: A more representative AP Hamiltonian (w/ (1,1) (2,0)/(0,2) diag. separately).
             //// (1) Construct transformation matrices.
             var ooztEigMat = new Complex[apb.Count, apb.Count];
+            var ud_du_zt_EigMat = new Complex[apb.Count, apb.Count];
             var ooztToApMat = new Complex[apb.Count, apb.Count];
+
             // E: Fill in the eigenvectors.
+            for (int i = 0; i < udb.Count; ++i)
+                for (int j = 0; j < udb.Count; ++j)
+                    ud_du_zt_EigMat[j, i] = udEigen[i].vec[j];
+            for (int i = 0; i < dub.Count; ++i)
+                for (int j = 0; j < dub.Count; ++j)
+                    ud_du_zt_EigMat[j + udb.Count, i + udb.Count] = udEigen[i].vec[j];
             for (int i = 0; i < oob.Count; ++i)
                 for (int j = 0; j < oob.Count; ++j)
                     ooztEigMat[j, i] = ooEigen[i].vec[j];
+
             for (int i = 0; i < ztb.Count; ++i)
-                for (int j = 0; j < ztb.Count; ++j)
-                    ooztEigMat[j + oob.Count, i + oob.Count] = ztEigen[i].vec[j];    
+                for (int j = 0; j < ztb.Count; ++j) {
+                    ooztEigMat[j + oob.Count, i + oob.Count] = ztEigen[i].vec[j];
+                    ud_du_zt_EigMat[j + oob.Count, i + oob.Count] = ztEigen[i].vec[j];
+                }
+
             // P: Permutation (from oo+zt => ap)        
             for (int i = 0; i < orderLU; ++i)
                 for (int j = 0; j < orderRD; ++j)
                     ooztToApMat[
-                        j + i * orderD  + orderLD, 
+                        j + i * orderD + orderLD,
                         j + i * orderRD] = 1.0;
             for (int i = 0; i < orderRU; ++i)
                 for (int j = 0; j < orderLD; ++j)
                     ooztToApMat[
-                        j + i * orderD  + orderLU * orderD, 
+                        j + i * orderD + orderLU * orderD,
                         j + i * orderLD + orderLU * orderRD] = 1.0;
             for (int i = 0; i < orderLU; ++i)
                 for (int j = 0; j < orderLD; ++j)
                     ooztToApMat[
-                        j + i * orderD, 
+                        j + i * orderD,
                         j + i * orderLD + orderLU * orderRD + orderRU * orderLD] = 1.0;
             for (int i = 0; i < orderRU; ++i)
                 for (int j = 0; j < orderRD; ++j)
                     ooztToApMat[
-                        j + i * orderD  + orderLU * orderD + orderLD, 
+                        j + i * orderD + orderLU * orderD + orderLD,
                         j + i * orderRD + orderLU * orderRD + orderRU * orderLD + orderLU * orderLD] = 1.0;
-                // if (i < apb.Count / 2)
-                //     ooztToApMat[i + apb.Count / 4, i] = 1.0;
-                // else if (i < apb.Count / 4 * 3)
-                //     ooztToApMat[i - apb.Count / 2, i] = 1.0;
-                // else 
-                //     ooztToApMat[i, i] = 1.0;
+            // if (i < apb.Count / 2)
+            //     ooztToApMat[i + apb.Count / 4, i] = 1.0;
+            // else if (i < apb.Count / 4 * 3)
+            //     ooztToApMat[i - apb.Count / 2, i] = 1.0;
+            // else 
+            //     ooztToApMat[i, i] = 1.0;
             // Calculate E+P+(hamAP)PE
             var pe = Eigen.Multiply(ooztToApMat, ooztEigMat);
             var peA = Eigen.Adjoint(pe);
 
             var hamAPdiag = Eigen.Multiply(
-                peA, 
+                peA,
                 Eigen.Multiply(hamAP, pe));
 
             var cHamAPdiag = Eigen.Multiply(
-                peA, 
+                peA,
                 Eigen.Multiply(cHamAP, pe));
 
+            var pe2 = Eigen.Multiply(ooztToApMat, ud_du_zt_EigMat);
+            var pe2A = Eigen.Adjoint(pe2);
+
+            var hamAP2diag = Eigen.Multiply(
+                pe2A,
+                Eigen.Multiply(hamAP, pe2));
+
+            var cHamAP2diag = Eigen.Multiply(
+                pe2A,
+                Eigen.Multiply(cHamAP, pe2));
 
             //// NOTE: Create Reports (Verbal & NXY data)
             SetStatus("Writing Report ...");
             string verbalReport = "";
+
+            ////// NOTE: AP_Ham & UD_DU_Ham
+            string apHamReport = "";
+            string udduHamReport = "";
+            string apCHamReport = "";
+            string udduCHamReport = "";
+            foreach (var i in Enumerable.Range(0, apb.Count)) {
+                foreach (var j in Enumerable.Range(0, apb.Count)) {
+                    // apHamReport += Math.Log10(hamAPdiag[i, j].Magnitude).ToString("e1") + "\t\t";
+                    // apCHamReport += Math.Log10(cHamAPdiag[i, j].Magnitude).ToString("e1") + "\t\t";
+                    // udduHamReport += Math.Log10(hamAP2diag[i, j].Magnitude).ToString("e1") + "\t\t";
+                    // udduCHamReport += Math.Log10(cHamAP2diag[i, j].Magnitude).ToString("e1") + "\t\t";
+                    apHamReport += hamAPdiag[i, j].Magnitude.ToString("e1") + "\t\t";
+                    apCHamReport += cHamAPdiag[i, j].Magnitude.ToString("e1") + "\t\t";
+                    udduHamReport += hamAP2diag[i, j].Magnitude.ToString("e1") + "\t\t";
+                    udduCHamReport += cHamAP2diag[i, j].Magnitude.ToString("e1") + "\t\t";
+                }
+                apHamReport += "\r\n";
+                apCHamReport += "\r\n";
+                udduHamReport += "\r\n";
+                udduCHamReport += "\r\n";
+            }
+
+            RPath NnDQDJApHamPath = NnDQDJPath.SubPath($"ApHam.txt");
+            RPath NnDQDJApCHamPath = NnDQDJPath.SubPath($"ApCHam.txt");
+            RPath NnDQDJUdduHamPath = NnDQDJPath.SubPath($"UdduHam.txt");
+            RPath NnDQDJUdduCHamPath = NnDQDJPath.SubPath($"UdduCHam.txt");
+
+            File.WriteAllText(NnDQDJApHamPath, apHamReport);
+            File.WriteAllText(NnDQDJApCHamPath, apCHamReport);
+            File.WriteAllText(NnDQDJUdduHamPath, udduHamReport);
+            File.WriteAllText(NnDQDJUdduCHamPath, udduCHamReport);
 
             ////// NOTE: Corrected energy
 
@@ -559,17 +629,17 @@ namespace NnManager {
             ////// NOTE: Pickup eigenstates (candidates), label them by their leading components.
 
             StringBuilder
-                ap0Info = new StringBuilder($"[AP#0]: "),
+            ap0Info = new StringBuilder($"[AP#0]: "),
                 ap1Info = new StringBuilder($"[AP#1]: "),
                 uu0Info = new StringBuilder($"[++#0]: "),
-                dd0Info = new StringBuilder($"[--#0]: "),                
+                dd0Info = new StringBuilder($"[--#0]: "),
                 oo0Info = new StringBuilder($"[11#0]: "),
                 oo1Info = new StringBuilder($"[11#1]: "),
                 zt0Info = new StringBuilder($"[02#0]: "),
                 ddd0Info = new StringBuilder($"[---#0]: "),
                 udd0Info = new StringBuilder($"[+--#0]: "),
                 udd1Info = new StringBuilder($"[+--#1]: ");
-            
+
             var infoList = new [] {
                 (ap0Info, apEigen[0], apb.Select(t => t.name), uWF, dWF),
                 (ap1Info, apEigen[1], apb.Select(t => t.name), uWF, dWF),
@@ -585,11 +655,11 @@ namespace NnManager {
             if (do3Particle == "yes") {
                 infoList.Add((ddd0Info, dddEigen[0], dddb.Select(t => t.name), dWF, dWF));
                 infoList.Add((udd0Info, uddEigen[0], uddb.Select(t => t.name), dWF, dWF));
-                infoList.Add((udd1Info, uddEigen[1], uddb.Select(t => t.name), dWF, dWF));           
+                infoList.Add((udd1Info, uddEigen[1], uddb.Select(t => t.name), dWF, dWF));
             }
 
             // foreach (var (infoBuilder, eig, basis, spb1, spb2) in infoList) {
-            foreach (var (infoBuilder, eig, basisName, _, _) in infoList) {
+            foreach (var(infoBuilder, eig, basisName, _, _) in infoList) {
                 var energy = eig.val;
 
                 var compList = new List < (int index, Complex occup) > ();
@@ -636,39 +706,38 @@ namespace NnManager {
                 // NnDQDJEnergies = new List<double>{p0GSE, p1GSE, p2GSE};
             }
 
-            string gsCoulombInfo = 
+            string gsCoulombInfo =
                 $"\n1PGS Coulomb energy (LR, LL, RR, t(LR/RR)):\n {cHamAP[orderLD,orderLD].Real} {cHamAP[0,0].Real} {cHamAP[orderLU*orderD+orderLD,orderLU*orderD+orderLD].Real} {cHamAP[orderLD,orderLU*orderD+orderLD].Magnitude}";
-            string coulombInfo = 
+            string coulombInfo =
                 $"\nCoulomb energy (11#0, 11#1, 02#0, 02#1):\n {cHamAPdiag[0,0].Real} {cHamAPdiag[1,1].Real} {cHamAPdiag[oob.Count,oob.Count].Real} {cHamAPdiag[oob.Count + 1,oob.Count + 1].Real}";
-            string hamAPdiagInfo = 
+            string hamAPdiagInfo =
                 $"\nCoulomb energy + Eig. (11#0, 11#1, 02#0, 02#1):\n {hamAPdiag[0,0].Real} {hamAPdiag[1,1].Real} {hamAPdiag[oob.Count,oob.Count].Real} {hamAPdiag[oob.Count + 1,oob.Count + 1].Real}";
-            
-            var t00 = cHamAPdiag[0,oob.Count  ].Magnitude;
-            var t01 = cHamAPdiag[0,oob.Count+1].Magnitude;
-            var t10 = cHamAPdiag[1,oob.Count  ].Magnitude;
-            var t11 = cHamAPdiag[1,oob.Count+1].Magnitude;
 
-            string tunnelingInfo = 
-                $"\nTunneling energy (rms, avg, t00, t01, t10, t11):\n" + 
-                $" {Math.Sqrt(0.25 * (t00*t00 + t01*t01 + t10*t10 + t11*t11))} {0.25 * (t00 + t01 + t10 + t11)}\n" + 
+            var t00 = cHamAPdiag[0, oob.Count].Magnitude;
+            var t01 = cHamAPdiag[0, oob.Count + 1].Magnitude;
+            var t10 = cHamAPdiag[1, oob.Count].Magnitude;
+            var t11 = cHamAPdiag[1, oob.Count + 1].Magnitude;
+
+            string tunnelingInfo =
+                $"\nTunneling energy (rms, avg, t00, t01, t10, t11):\n" +
+                $" {Math.Sqrt(0.25 * (t00*t00 + t01*t01 + t10*t10 + t11*t11))} {0.25 * (t00 + t01 + t10 + t11)}\n" +
                 $" {t00} {t01} {t10} {t11}";
 
-            StringBuilder  repulsionInfoBuilder = new StringBuilder();
+            StringBuilder repulsionInfoBuilder = new StringBuilder();
             StringBuilder cRepulsionInfoBuilder = new StringBuilder();
 
-            foreach (var (info, ham, comment) in new [] {
-                (repulsionInfoBuilder, hamAPdiag, "(w/ Eig.)"),
-                (cRepulsionInfoBuilder, cHamAPdiag, "")
-            })
-            {   
-                var u00 = (ham[oob.Count,oob.Count] - ham[0,0]).Real;
-                var u01 = (ham[oob.Count,oob.Count] - ham[1,1]).Real;
-                var u10 = (ham[oob.Count+1,oob.Count+1] - ham[0,0]).Real;
-                var u11 = (ham[oob.Count+1,oob.Count+1] - ham[1,1]).Real;
-                
-                info.Append( 
-                    $"\nRepulsion energy {comment} (rms, avg, u00, u01, u10, u11):\n" + 
-                    $" {Math.Sqrt(0.25 * (u00*u00 + u01*u01 + u10*u10 + u11*u11))} {0.25 * (u00 + u01 + u10 + u11)}\n" + 
+            foreach (var(info, ham, comment) in new [] {
+                    (repulsionInfoBuilder, hamAPdiag, "(w/ Eig.)"),
+                    (cRepulsionInfoBuilder, cHamAPdiag, "")
+                }) {
+                var u00 = (ham[oob.Count, oob.Count] - ham[0, 0]).Real;
+                var u01 = (ham[oob.Count, oob.Count] - ham[1, 1]).Real;
+                var u10 = (ham[oob.Count + 1, oob.Count + 1] - ham[0, 0]).Real;
+                var u11 = (ham[oob.Count + 1, oob.Count + 1] - ham[1, 1]).Real;
+
+                info.Append(
+                    $"\nRepulsion energy {comment} (rms, avg, u00, u01, u10, u11):\n" +
+                    $" {Math.Sqrt(0.25 * (u00*u00 + u01*u01 + u10*u10 + u11*u11))} {0.25 * (u00 + u01 + u10 + u11)}\n" +
                     $" {u00} {u01} {u10} {u11}");
             }
 
@@ -690,8 +759,8 @@ namespace NnManager {
                 coulombInfo +
                 hamAPdiagInfo +
                 tunnelingInfo +
-                repulsionInfoBuilder + 
-                cRepulsionInfoBuilder + 
+                repulsionInfoBuilder +
+                cRepulsionInfoBuilder +
 
                 "\n\n" + ddd0Info + "\n" + udd0Info + "\n" + udd1Info;
 

@@ -610,7 +610,7 @@ namespace NnManager {
             (ScalarField field, bool isDen) z,
             Complex[, , ] coulomb,
             Dictionary < (ScalarField, ScalarField), Complex > ? coulombCache = null) {
-            Complex result;
+            Complex result = Complex.Zero;
             if (x.isDen) result += Coulomb(y.field, z.field, coulomb, coulombCache);
             if (y.isDen) result += Coulomb(z.field, x.field, coulomb, coulombCache);
             if (z.isDen) result += Coulomb(x.field, y.field, coulomb, coulombCache);

@@ -166,6 +166,7 @@ namespace NnManager {
         //     return new NnParam(newVars, left.consts);
         // }    
 
+        [Obsolete]
         public string GetTag(ImmutableDictionary<string, string?>? variableDef = null) {
             // FIXME: Using only variables here
 

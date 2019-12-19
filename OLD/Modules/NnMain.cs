@@ -73,7 +73,7 @@ namespace NnManager {
         }
     }
 
-    class NnMainLog : LogBase {
+    public class NnMainLog : LogBase {
         int quantumPossionItCount = 0;
 
         // FIXME: complete it!

@@ -335,6 +335,22 @@ namespace NnManager {
             return result;
         }
 
+        public string GenerateTag(ImmutableDictionary<string, string> paramVariables) {
+            // FIXME: Using only variables here
+
+            string result = "(";
+
+            foreach (var key in paramVariables.Keys.OrderBy(k => k)) {
+                if (Variables != null)
+                    if (paramVariables[key] == Variables[key]) continue;
+                result += $"{key}={paramVariables[key].ToString()}, ";
+            }
+            if (result == "(")
+                return "(default)";
+
+            return result.Substring(0, result.Length - 2) + ")";
+        }        
+
         string Evaluate(string input, ImmutableDictionary<string, string> param) {
             
             string tokenVariable = "\\$";
