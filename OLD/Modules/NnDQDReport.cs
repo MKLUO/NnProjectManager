@@ -35,7 +35,7 @@ namespace NnManager {
                 {"portion", "0.7"},
                 {"L_x0", "-"}, {"L_y0", "-"}, {"L_z0", "-"}, {"L_x1", "-"}, {"L_y1", "-"}, {"L_z1", "-"}, 
                 {"R_x0", "-"}, {"R_y0", "-"}, {"R_z0", "-"}, {"R_x1", "-"}, {"R_y1", "-"}, {"R_z1", "-"}, 
-                {"band", "X1"},
+                {"band", "X3"},
                 {"non_SC", "no"}
             }.ToImmutableDictionary();
 
@@ -81,16 +81,18 @@ namespace NnManager {
 
             //==========Remove data of other bands==========
             // FIXME: What would happen if there's multiple quantum region ?
-            options.TryGetValue("band", out string? band);
-            if (band == "X1") {
-                foreach (var file in Directory.GetFiles(NNPath, "*_X2*"))
-                    File.Delete(file);
-                foreach (var file in Directory.GetFiles(NNPath, "*_X3*"))
-                    File.Delete(file);
-            } else {
-                // FIXME: Bands other than X1 is not implemented yet!
+            options.TryGetValue("band", out string? bandStr);
+            if (!Enum.TryParse<NnAgent.BandType>(bandStr, out NnAgent.BandType band)) 
                 return false;
-            }
+            // if (band == "X1") {
+            //     foreach (var file in Directory.GetFiles(NNPath, "*_X2*"))
+            //         File.Delete(file);
+            //     foreach (var file in Directory.GetFiles(NNPath, "*_X3*"))
+            //         File.Delete(file);
+            // } else {
+            //     // FIXME: Bands other than X1 is not implemented yet!
+            //     return false;
+            // }
 
 
             //==========Categorize 1d & 2d data (1d & 2d are not needed)==========
@@ -109,8 +111,7 @@ namespace NnManager {
 
 
             //==========Read energy & occupation from spectrum==========
-            // TODO: Bands other than X1 is not implemented yet!
-            RPath? spectrumFile = NNPath.SubPath("wf_spectrum_quantum_region_X1.dat");
+            RPath? spectrumFile = NNPath.SubPath($"wf_spectrum_quantum_region_{band.ToString()}.dat");
             if (spectrumFile?.Content == null) 
                 return false;
             
@@ -172,9 +173,9 @@ namespace NnManager {
 
 
             //==========Calculate dot-region occupation from wave function (probabilities)==========
-            var portionSpin = CalculateSpinPortion(NNPath);
-            var portionL = CalculatePortions((L_x0, L_y0, L_z0), (L_x1, L_y1, L_z1), NNPath);
-            var portionR = CalculatePortions((R_x0, R_y0, R_z0), (R_x1, R_y1, R_z1), NNPath);
+            var portionSpin = CalculateSpinPortion(NNPath, band);
+            var portionL = CalculatePortions((L_x0, L_y0, L_z0), (L_x1, L_y1, L_z1), NNPath, band);
+            var portionR = CalculatePortions((R_x0, R_y0, R_z0), (R_x1, R_y1, R_z1), NNPath, band);
 
             if (occup.Keys.Except(portionL.Keys).Count() != 0)
                 return false;
@@ -202,14 +203,14 @@ namespace NnManager {
 
                 // Move bound state prob.s to output directory for reference.
                 (RPath? data, RPath? coord, RPath? fld, RPath? v) = 
-                    NnAgent.GetCoordAndDat(NNPath, NnAgent.NnProbFileEntry(NnAgent.BandType.X1, id));
+                    NnAgent.GetCoordAndDat(NNPath, NnAgent.NnProbFileEntry(band, id));
 
                 (RPath? dataNew, RPath? coordNew, _, RPath? vNew) = 
-                    NnAgent.GetCoordAndDat(NnDQDReportPath, NnAgent.NnProbFileEntry(NnAgent.BandType.X1, id), true);
-                (_, _, RPath? fldLUNew, _) = NnAgent.GetCoordAndDat(NnDQDReportPath, $"LU_" + NnAgent.NnProbFileEntry(NnAgent.BandType.X1, lUSpecCount), true);
-                (_, _, RPath? fldRUNew, _) = NnAgent.GetCoordAndDat(NnDQDReportPath, $"RU_" + NnAgent.NnProbFileEntry(NnAgent.BandType.X1, rUSpecCount), true);
-                (_, _, RPath? fldLDNew, _) = NnAgent.GetCoordAndDat(NnDQDReportPath, $"LD_" + NnAgent.NnProbFileEntry(NnAgent.BandType.X1, lDSpecCount), true);
-                (_, _, RPath? fldRDNew, _) = NnAgent.GetCoordAndDat(NnDQDReportPath, $"RD_" + NnAgent.NnProbFileEntry(NnAgent.BandType.X1, rDSpecCount), true);
+                    NnAgent.GetCoordAndDat(NnDQDReportPath, NnAgent.NnProbFileEntry(band, id), true);
+                (_, _, RPath? fldLUNew, _) = NnAgent.GetCoordAndDat(NnDQDReportPath, $"LU_" + NnAgent.NnProbFileEntry(band, lUSpecCount), true);
+                (_, _, RPath? fldRUNew, _) = NnAgent.GetCoordAndDat(NnDQDReportPath, $"RU_" + NnAgent.NnProbFileEntry(band, rUSpecCount), true);
+                (_, _, RPath? fldLDNew, _) = NnAgent.GetCoordAndDat(NnDQDReportPath, $"LD_" + NnAgent.NnProbFileEntry(band, lDSpecCount), true);
+                (_, _, RPath? fldRDNew, _) = NnAgent.GetCoordAndDat(NnDQDReportPath, $"RD_" + NnAgent.NnProbFileEntry(band, rDSpecCount), true);
 
                 if (data == null || coord == null || fld == null || v == null ||
                     dataNew == null || coordNew == null || vNew == null ||
@@ -277,32 +278,12 @@ namespace NnManager {
             return true;
         }
 
-        ImmutableDictionary<int, double> CalculateSpinPortion(RPath NNPath) {
+        ImmutableDictionary<int, double> CalculateSpinPortion(RPath NNPath, NnAgent.BandType band) {
             int counter = 1;
             Dictionary<int, double> result = new Dictionary<int, double>();
             while (true) {                
-                // var entriesDown = NnAgent.NnAmplFileEntry(NnAgent.BandType.X1, counter, NnAgent.Spin.Down);
-                // var entriesUp = NnAgent.NnAmplFileEntry(NnAgent.BandType.X1, counter, NnAgent.Spin.Up);
-                // (RPath? dataImagD, RPath? coordImagD, _, _) = NnAgent.GetCoordAndDat(NNPath, entriesDown.imag);
-                // (RPath? dataRealD, RPath? coordRealD, _, _) = NnAgent.GetCoordAndDat(NNPath, entriesDown.real);
-                // (RPath? dataImagU, RPath? coordImagU, _, _) = NnAgent.GetCoordAndDat(NNPath, entriesUp.imag);
-                // (RPath? dataRealU, RPath? coordRealU, _, _) = NnAgent.GetCoordAndDat(NNPath, entriesUp.real);
-                // if ((dataImagD?.Content == null) || (coordImagD?.Content == null) ||
-                //     (dataImagU?.Content == null) || (coordImagU?.Content == null) ||
-                //     (dataRealD?.Content == null) || (coordRealD?.Content == null) ||
-                //     (dataRealU?.Content == null) || (coordRealU?.Content == null))
-                //     break;
-
-                // ScalarField fieldImagD = ScalarField.FromNnDatAndCoord(dataImagD.Content, coordImagD.Content);  
-                // ScalarField fieldImagU = ScalarField.FromNnDatAndCoord(dataImagU.Content, coordImagU.Content);  
-                // ScalarField fieldRealD = ScalarField.FromNnDatAndCoord(dataRealD.Content, coordRealD.Content);  
-                // ScalarField fieldRealU = ScalarField.FromNnDatAndCoord(dataRealU.Content, coordRealU.Content);  
-
-                // var normU = fieldImagU.Norm() + fieldRealU.Norm();
-                // var normD = fieldImagD.Norm() + fieldRealD.Norm();
-
-                var entriesDown = NnAgent.NnProbFileEntry(NnAgent.BandType.X1, counter, NnAgent.Spin.Down);
-                var entriesUp = NnAgent.NnProbFileEntry(NnAgent.BandType.X1, counter, NnAgent.Spin.Up);
+                var entriesDown = NnAgent.NnProbFileEntry(band, counter, NnAgent.Spin.Down);
+                var entriesUp = NnAgent.NnProbFileEntry(band, counter, NnAgent.Spin.Up);
                 (RPath? dataD, RPath? coordD, _, _) = NnAgent.GetCoordAndDat(NNPath, entriesDown);
                 (RPath? dataU, RPath? coordU, _, _) = NnAgent.GetCoordAndDat(NNPath, entriesUp);
                 if ((dataD?.Content == null) || (coordD?.Content == null) ||
@@ -327,13 +308,14 @@ namespace NnManager {
             // (string x, string y, string z) coord1
             (double? x, double? y, double? z) coord0,
             (double? x, double? y, double? z) coord1,
-            RPath NNPath
+            RPath NNPath, 
+            NnAgent.BandType band
         ) {
             int counter = 1;
             RPath? data, coord;
 
             Dictionary<int, double> result = new Dictionary<int, double>();
-            while( ((data, coord, _, _) = NnAgent.GetCoordAndDat(NNPath, NnAgent.NnProbFileEntry(NnAgent.BandType.X1, counter))) != (null, null, null, null)) {                
+            while( ((data, coord, _, _) = NnAgent.GetCoordAndDat(NNPath, NnAgent.NnProbFileEntry(band, counter))) != (null, null, null, null)) {                
                 if ((data?.Content == null) || (coord?.Content == null))
                     continue;
 

@@ -36,6 +36,7 @@ namespace NnManager {
                 { "y1", "-" },
                 { "z0", "-" },
                 { "z1", "-" },
+                { "band", "X3" },
                 { "order", "2" },
                 { "3particle", "no" },
                 { "enableFTDict", "no" }
@@ -66,6 +67,10 @@ namespace NnManager {
         bool NnDQDJExecute(CancellationToken ct, ImmutableDictionary<string, string> options) {
 
             if (!Eigen.Test())
+                return false;
+
+            options.TryGetValue("band", out string? bandStr);
+            if (!Enum.TryParse<NnAgent.BandType>(bandStr, out NnAgent.BandType band)) 
                 return false;
 
             // FIXME: Can it be reduced?
@@ -152,7 +157,7 @@ namespace NnManager {
                     (rUWF, specRU, NnAgent.Spin.Up, orderRU)
                 }) {
                 for (int i = 0; i < ord; i++) {
-                    var wfs = NnAgent.NnAmplFileEntry(NnAgent.BandType.X1, spec[i].Id, spin);
+                    var wfs = NnAgent.NnAmplFileEntry(band, spec[i].Id, spin);
                     (var wfImagData, var wfImagCoord, _, _) = NnAgent.GetCoordAndDat(NNPath, wfs.imag);
                     (var wfRealData, var wfRealCoord, _, _) = NnAgent.GetCoordAndDat(NNPath, wfs.real);
                     if ((wfImagData?.Content == null) || (wfImagCoord?.Content == null) ||
