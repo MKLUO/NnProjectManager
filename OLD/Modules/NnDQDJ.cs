@@ -39,7 +39,7 @@ namespace NnManager {
                 { "band", "X3" },
                 { "order", "2" },
                 { "3particle", "no" },
-                { "enableFTDict", "no" }
+                { "renorm", "no" }
             }.ToImmutableDictionary();
 
         bool NnDQDJCanExecute() => NnDQDReportIsDone();
@@ -88,6 +88,9 @@ namespace NnManager {
             double? z1 = z1s != "-" ? Convert.ToDouble(z1s) : (double?) null;
             options.TryGetValue("order", out string? orders);
             int order = orders != "-" ? Convert.ToUInt16(orders) : 2;
+
+            options.TryGetValue("renorm", out string? renorms);
+            bool renorm = renorms == "yes";
 
             //// NOTE: Read in spectrum & info (from DQD Report) ////
             SetStatus("Reading spectrum ...");
@@ -169,7 +172,8 @@ namespace NnManager {
                         wfImagData.Content, wfImagCoord.Content
                     ).Truncate((x0, y0, z0), (x1, y1, z1));
 
-                    wf = wf * Math.Pow(1.0 / wf.Norm(), 0.5);
+                    if (renorm)
+                        wf = wf * Math.Pow(1.0 / wf.Norm(), 0.5);
 
                     // Truncate WFs
                     wfCollection.Add((
@@ -318,11 +322,6 @@ namespace NnManager {
 
             var cHamUD = new Complex[udb.Count(), udb.Count()];
             var cHamDU = new Complex[dub.Count(), dub.Count()];
-
-            // options.TryGetValue("enableFTDict", out string? enableFTDicts);
-            // Dictionary<Complex[, , ], Complex[, , ]> ? ftDict = null;
-            // if (enableFTDicts == "yes")
-            //     ftDict = new Dictionary<Complex[, , ], Complex[, , ]>();
 
             var coulombCache = new Dictionary < (ScalarField, ScalarField),
                 Complex > ();
