@@ -662,13 +662,21 @@ namespace NnManager {
             // File.WriteAllText(NnDQDJCorrectedEnergyPath, reportEnergy);
 
             ////// NOTE: GS density
-            ScalarField gsAPDen = denUp[0, 0] * 0.0;
+            ScalarField gsAP0Den = denUp[0, 0] * 0.0;
+            ScalarField gsAP1Den = denUp[0, 0] * 0.0;
             ScalarField gsDDDen = denUp[0, 0] * 0.0;
+            ScalarField gsZTDen = denUp[0, 0] * 0.0;
             foreach (var i in Enumerable.Range(0, apb.Count)) {
                 var mag = apEigen[0].vec[i];
                 var idxi = apb[i].i;
                 var idxj = apb[i].j;
-                gsAPDen += 0.5 * Math.Pow(mag.Magnitude, 2) * (denUp[idxi, idxi] + denDown[idxj, idxj]);
+                gsAP0Den += 0.5 * Math.Pow(mag.Magnitude, 2) * (denUp[idxi, idxi] + denDown[idxj, idxj]);
+            }
+            foreach (var i in Enumerable.Range(0, apb.Count)) {
+                var mag = apEigen[1].vec[i];
+                var idxi = apb[i].i;
+                var idxj = apb[i].j;
+                gsAP1Den += 0.5 * Math.Pow(mag.Magnitude, 2) * (denUp[idxi, idxi] + denDown[idxj, idxj]);
             }
 
             foreach (var i in Enumerable.Range(0, ddb.Count)) {
@@ -676,11 +684,20 @@ namespace NnManager {
                 var idxi = ddb[i].i;
                 var idxj = ddb[i].j;
                 gsDDDen += 0.5 * Math.Pow(mag.Magnitude, 2) * (denDown[idxi, idxi] + denDown[idxj, idxj]);
-            }      
+            }     
+
+            foreach (var i in Enumerable.Range(0, ztb.Count)) {
+                var mag = ztEigen[0].vec[i];
+                var idxi = ztb[i].i;
+                var idxj = ztb[i].j;
+                gsZTDen += 0.5 * Math.Pow(mag.Magnitude, 2) * (denUp[idxi, idxi] + denDown[idxj, idxj]);
+            }    
 
             foreach (var (entry, field) in new [] {
-                ("APGSDEN", gsAPDen),
-                ("DDGSDEN", gsDDDen)
+                ("AP0GSDEN", gsAP0Den),
+                ("AP1GSDEN", gsAP1Den),
+                ("DDGSDEN", gsDDDen),
+                ("ZTGSDEN", gsZTDen)
             }) {
                 File.WriteAllText(
                     NnDQDJPath.SubPath($"{entry}.fld"), 

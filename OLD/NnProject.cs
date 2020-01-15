@@ -29,7 +29,7 @@ namespace NnManager {
         }
 
         // FIXME: maxConcurrentTaskCount
-        const int maxConcurrentTaskCount = 2;
+        const int maxConcurrentTaskCount = 3;
         int CurrentTaskCount => plans.Sum(x => x.RunningTasks);
 
         Task? scheduler;
@@ -253,7 +253,7 @@ namespace NnManager {
         void SchedulerMainLoop() {
             do {
                 // TODO: delay?
-                Task.Delay(500).Wait();
+                Task.Delay(3000).Wait();
 
                 if (CurrentTaskCount >= maxConcurrentTaskCount)
                     continue;
