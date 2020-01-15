@@ -661,6 +661,40 @@ namespace NnManager {
             // }
             // File.WriteAllText(NnDQDJCorrectedEnergyPath, reportEnergy);
 
+            ////// NOTE: GS density
+            ScalarField gsAPDen = denUp[0, 0] * 0.0;
+            ScalarField gsDDDen = denUp[0, 0] * 0.0;
+            foreach (var i in Enumerable.Range(0, apb.Count)) {
+                var mag = apEigen[0].vec[i];
+                var idxi = apb[i].i;
+                var idxj = apb[i].j;
+                gsAPDen += 0.5 * Math.Pow(mag.Magnitude, 2) * (denUp[idxi, idxi] + denDown[idxj, idxj]);
+            }
+
+            foreach (var i in Enumerable.Range(0, ddb.Count)) {
+                var mag = ddEigen[0].vec[i];
+                var idxi = ddb[i].i;
+                var idxj = ddb[i].j;
+                gsDDDen += 0.5 * Math.Pow(mag.Magnitude, 2) * (denDown[idxi, idxi] + denDown[idxj, idxj]);
+            }      
+
+            foreach (var (entry, field) in new [] {
+                ("APGSDEN", gsAPDen),
+                ("DDGSDEN", gsDDDen)
+            }) {
+                File.WriteAllText(
+                    NnDQDJPath.SubPath($"{entry}.fld"), 
+                    ScalarField.ToNnRealFieldFldXY(field, entry));
+                File.WriteAllLines(
+                    NnDQDJPath.SubPath($"{entry}.dat"), 
+                    ScalarField.ToNnRealFieldDatXYLines(
+                        field, field.Coords[ScalarField.Dim.Z].Count / 2));
+                File.WriteAllLines(
+                    NnDQDJPath.SubPath($"{entry}.coord"), 
+                    ScalarField.ToNnRealFieldCoordXYLines(field));                
+            }
+
+
             ////// NOTE: J
             var J = apEigen[0].val + apEigen[1].val - uuEigen[0].val - ddEigen[0].val;
             verbalReport += $"J = {J.ToString("E04")} (eV), order = {order}\n";

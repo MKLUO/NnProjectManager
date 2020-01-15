@@ -158,6 +158,27 @@ namespace NnManager {
                         yield return data.Data[x, y, z].Real.ToString();
         }
 
+        public static string ToNnRealFieldFldXY(
+            ScalarField data, string label
+        ) {            
+            return $"\n# AVS/Express field file\n#\nndim = 2\ndim1 = {data.Coords[Dim.X].Count}\ndim2 = {data.Coords[Dim.Y].Count}\nnspace = 2\nveclen = 1\ndata = double\nfield = rectilinear\nlabel = {label}\n\nvariable 1 file={label}.dat filetype=ascii skip=0 offset=0 stride=1\ncoord 1 file={label}.coord filetype=ascii skip=0 offset=0 stride=1\ncoord 2 file={label}.coord filetype=ascii skip=0 offset=0 stride=1\n            ";
+        }
+        public static IEnumerable<string> ToNnRealFieldDatXYLines(
+            ScalarField data, int zIndex
+        ) {            
+            foreach (var y in Enumerable.Range(0, data.Coords[Dim.Y].Count))
+                foreach (var x in Enumerable.Range(0, data.Coords[Dim.X].Count))
+                    yield return data.Data[x, y, zIndex].Real.ToString();
+        }
+        public static IEnumerable<string> ToNnRealFieldCoordXYLines(
+            ScalarField data
+        ) {
+            foreach (var x in data.Coords[Dim.X])
+                yield return x.ToString();
+            foreach (var y in data.Coords[Dim.Y])
+                yield return y.ToString();
+        }
+
         bool IsWithinRange(double? x0, double? x1, double x) {
             if ((x0 == null) || (x1 == null)) return true;
             return (x - x0) * (x - x1) <= 0.0;
