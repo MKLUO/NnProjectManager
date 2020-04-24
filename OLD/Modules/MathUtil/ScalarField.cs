@@ -38,7 +38,7 @@ namespace NnManager {
         }
 
         static(double[, , ], ImmutableDictionary<Dim, List<double>>) NnDatAndCoordToField(
-            string data, string coord
+            string data, string coord, int skip = 0
         ) {
             string[] coordLines =
                 coord.Splitter("[\r\n|\r|\n]+");
@@ -72,8 +72,11 @@ namespace NnManager {
                 if (coords[dim].Count == 0)
                     coords[dim].Add(0.0);
 
-            string[] dataLines =
+            string[] allDataLines =
                 data.Splitter("[\r\n|\r|\n]+");
+
+            var dataLines = allDataLines.Skip(
+                skip * coords[Dim.X].Count * coords[Dim.Y].Count * coords[Dim.Z].Count);
 
             double[, , ] array = new double[
                 coords[Dim.X].Count,
@@ -99,9 +102,9 @@ namespace NnManager {
 
         // FIXME: WET!
         public static ScalarField FromNnDatAndCoord(
-            string dataR, string coordR
+            string dataR, string coordR, int skip = 0
         ) {
-            var(arrayR, coordsR) = NnDatAndCoordToField(dataR, coordR);
+            var(arrayR, coordsR) = NnDatAndCoordToField(dataR, coordR, skip);
 
             Complex[, , ] array = new Complex[
                 coordsR[Dim.X].Count,

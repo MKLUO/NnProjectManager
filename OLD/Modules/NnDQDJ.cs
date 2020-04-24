@@ -796,22 +796,23 @@ namespace NnManager {
                 // NnDQDJEnergies = new List<double>{p0GSE, p1GSE, p2GSE};
             }
 
-            string gsCoulombInfo =
-                $"\n1PGS Coulomb energy (LR, LL, RR, t(LR/RR)):\n {cHamAP[orderLD,orderLD].Real} {cHamAP[0,0].Real} {cHamAP[orderLU*orderD+orderLD,orderLU*orderD+orderLD].Real} {cHamAP[orderLD,orderLU*orderD+orderLD].Magnitude}";
-            string coulombInfo =
-                $"\nCoulomb energy (11#0, 11#1, 02#0, 02#1):\n {cHamAPdiag[0,0].Real} {cHamAPdiag[1,1].Real} {cHamAPdiag[oob.Count,oob.Count].Real} {cHamAPdiag[oob.Count + 1,oob.Count + 1].Real}";
-            string hamAPdiagInfo =
-                $"\nCoulomb energy + Eig. (11#0, 11#1, 02#0, 02#1):\n {hamAPdiag[0,0].Real} {hamAPdiag[1,1].Real} {hamAPdiag[oob.Count,oob.Count].Real} {hamAPdiag[oob.Count + 1,oob.Count + 1].Real}";
+            // FIXME: SQD HACK!
+            //string gsCoulombInfo =
+            //    $"\n1PGS Coulomb energy (LR, LL, RR, t(LR/RR)):\n {cHamAP[orderLD,orderLD].Real} {cHamAP[0,0].Real} {cHamAP[orderLU*orderD+orderLD,orderLU*orderD+orderLD].Real} {cHamAP[orderLD,orderLU*orderD+orderLD].Magnitude}";
+            //string coulombInfo =
+            //    $"\nCoulomb energy (11#0, 11#1, 02#0, 02#1):\n {cHamAPdiag[0,0].Real} {cHamAPdiag[1,1].Real} {cHamAPdiag[oob.Count,oob.Count].Real} {cHamAPdiag[oob.Count + 1,oob.Count + 1].Real}";
+            //string hamAPdiagInfo =
+            //    $"\nCoulomb energy + Eig. (11#0, 11#1, 02#0, 02#1):\n {hamAPdiag[0,0].Real} {hamAPdiag[1,1].Real} {hamAPdiag[oob.Count,oob.Count].Real} {hamAPdiag[oob.Count + 1,oob.Count + 1].Real}";
 
-            var t00 = cHamAPdiag[0, oob.Count].Magnitude;
-            var t01 = cHamAPdiag[0, oob.Count + 1].Magnitude;
-            var t10 = cHamAPdiag[1, oob.Count].Magnitude;
-            var t11 = cHamAPdiag[1, oob.Count + 1].Magnitude;
+            //var t00 = cHamAPdiag[0, oob.Count].Magnitude;
+            //var t01 = cHamAPdiag[0, oob.Count + 1].Magnitude;
+            //var t10 = cHamAPdiag[1, oob.Count].Magnitude;
+            //var t11 = cHamAPdiag[1, oob.Count + 1].Magnitude;
 
-            string tunnelingInfo =
-                $"\nTunneling energy (rms, avg, t00, t01, t10, t11):\n" +
-                $" {Math.Sqrt(0.25 * (t00*t00 + t01*t01 + t10*t10 + t11*t11))} {0.25 * (t00 + t01 + t10 + t11)}\n" +
-                $" {t00} {t01} {t10} {t11}";
+            //string tunnelingInfo =
+            //    $"\nTunneling energy (rms, avg, t00, t01, t10, t11):\n" +
+            //    $" {Math.Sqrt(0.25 * (t00*t00 + t01*t01 + t10*t10 + t11*t11))} {0.25 * (t00 + t01 + t10 + t11)}\n" +
+            //    $" {t00} {t01} {t10} {t11}";
 
             StringBuilder repulsionInfoBuilder = new StringBuilder();
             StringBuilder cRepulsionInfoBuilder = new StringBuilder();
@@ -845,10 +846,10 @@ namespace NnManager {
 
                 ensembleGSInfo +
                 // apGSinfo + 
-                gsCoulombInfo +
-                coulombInfo +
-                hamAPdiagInfo +
-                tunnelingInfo +
+                //gsCoulombInfo +
+                //coulombInfo +
+                //hamAPdiagInfo +
+                //tunnelingInfo +
                 repulsionInfoBuilder +
                 cRepulsionInfoBuilder +
 
