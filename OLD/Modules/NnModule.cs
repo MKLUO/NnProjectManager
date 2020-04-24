@@ -21,6 +21,7 @@ namespace NnManager {
         NnDQDJ,
         // NnDen2DEG,
         // TestOpenNotepad,
+        NnLaplacian,
         Dummy
     }    
 
@@ -45,6 +46,8 @@ namespace NnManager {
                     module = NnDQDJ(options); break;
                 // case ModuleType.TestOpenNotepad:
                 //     module = TestOpenNotepad(options); break;
+                case ModuleType.NnLaplacian:
+                    module = NnLaplacion(options); break;
 
                 default: 
                     module = Dummy(options); break;
@@ -75,6 +78,8 @@ namespace NnManager {
                     return NnTask.NnDQDJDefaultOption;    
                 // case ModuleType.TestOpenNotepad:
                 //     return NnTask.TestOpenNotepadDefaultOption;
+                case ModuleType.NnLaplacian:
+                    return NnTask.NnLaplacianDefaultOption;
                 default: 
                     return NnTask.NoOption;
             }
