@@ -13,8 +13,12 @@ namespace NnManager {
     using Dim = ScalarField.Dim;
 
     public static class NnAgent {
+
+        readonly static string runAsDatePath = "D:\\Luo nextnano Output\\tools\\runasdate\\RunAsDate.exe";
+        readonly static string runAsDateDate = "28\\07\\2019";
+
         // TODO: Check for NN exe 
-        readonly static string nnMainPath = "C:\\Program Files (x86)\\nextnano\\2015_08_19\\";
+        readonly static string nnMainPath = "D:\\Luo nextnano Output\\tools\\nn2015_08_19\\";
         readonly static string nnPPPath = "nextnano++\\bin 64bit\\nextnano++_Intel_64bit.exe";
         readonly static string nn3Path = "nextnano3\\Intel 64bit\\nextnano3_Intel_64bit.exe";
         readonly static string nnPPDBPath = "nextnano++\\Syntax\\database_nnp.in\"";
@@ -30,39 +34,82 @@ namespace NnManager {
 
         public static void RunNnStructure(RPath path, string content, CancellationToken ct, NnType type) {
             try {
-                File.WriteAllText(
-                    path.SubPath(inputFileName),
-                    content);                    
-
                 string exePath = "";
                 string dBPath = "";
                 switch (type) {
-                    case NnType.Nn3: 
-                        exePath = nn3Path; 
+                    case NnType.Nn3:
+                        exePath = nn3Path;
                         dBPath = nn3DBPath;
                         break;
-                    case NnType.NnPP: 
+                    case NnType.NnPP:
                         exePath = nnPPPath;
                         dBPath = nnPPDBPath;
                         break;
                 }
                 if (exePath == "") throw new Exception();
-                
+
+                File.WriteAllText(
+                    path.SubPath(inputFileName),
+                    content);
+
+                // Util.StartAndWaitProcess(
+                //     nnMainPath + exePath,
+                //     " -s --license \"" + nnMainPath + "License\\license.txt\"" +
+                //     " --database \"" + nnMainPath + dBPath +
+                //     " --outputdirectory \"" + path + "\"" +
+                //     " --noautooutdir -log \"" + path.SubPath(inputFileName),
+                //     ct
+                // );
                 Util.StartAndWaitProcess(
-                    nnMainPath + exePath,
-                    " -s --license \"" + nnMainPath + "License\\license.txt\"" +
-                    " --database \"" + nnMainPath + dBPath +
-                    " --outputdirectory \"" + path + "\"" +
-                    " --noautooutdir -log \"" + path.SubPath(inputFileName),
+                    runAsDatePath,
+                    CommonArgs(path, type, true),
                     ct
                 );
+
+                Util.FindAndWaitProcess("nextnano++_Intel_64bit", ct); 
+
             } catch {
                 Util.ErrorHappend("Exception encountered in RunNnStructure (NnAgent)!");
             }
         }
 
+        static string CommonArgs(RPath path, NnType type, bool structureTest) {
+            string exePath = "";
+            string dBPath = "";
+            switch (type) {
+                case NnType.Nn3:
+                    exePath = nn3Path;
+                    dBPath = nn3DBPath;
+                    break;
+                case NnType.NnPP:
+                    exePath = nnPPPath;
+                    dBPath = nnPPDBPath;
+                    break;
+            }
+            if (exePath == "") throw new Exception();
+            string structureTestStr = structureTest? "-s": "";
+            return runAsDateDate + " \"" + nnMainPath + exePath + " \"" + $" {structureTestStr} --license \"" + nnMainPath + "License\\license.txt\"" +
+                " --database \"" + nnMainPath + dBPath +
+                " --outputdirectory \"" + path + "\"" +
+                " --noautooutdir -log \"" + path.SubPath(inputFileName);
+        }
+
         public static void RunNn(RPath path, string content, CancellationToken ct, NnType type) {
             try {
+                string exePath = "";
+                string dBPath = "";
+                switch (type) {
+                    case NnType.Nn3:
+                        exePath = nn3Path;
+                        dBPath = nn3DBPath;
+                        break;
+                    case NnType.NnPP:
+                        exePath = nnPPPath;
+                        dBPath = nnPPDBPath;
+                        break;
+                }
+                if (exePath == "") throw new Exception();
+
                 File.WriteAllText(
                     path.SubPath(inputFileName),
                     content);
@@ -71,28 +118,14 @@ namespace NnManager {
                     path.SubPath(inputRefFileName),
                     content);
 
-                string exePath = "";
-                string dBPath = "";
-                switch (type) {
-                    case NnType.Nn3: 
-                        exePath = nn3Path; 
-                        dBPath = nn3DBPath;
-                        break;
-                    case NnType.NnPP: 
-                        exePath = nnPPPath;
-                        dBPath = nnPPDBPath;
-                        break;
-                }
-                if (exePath == "") throw new Exception();
-
                 Util.StartAndWaitProcess(
-                    nnMainPath + exePath,
-                    " --license \"" + nnMainPath + "License\\license.txt\"" +
-                    " --database \"" + nnMainPath + dBPath +
-                    " --outputdirectory \"" + path + "\"" +
-                    " --noautooutdir -log \"" + path.SubPath(inputFileName),
+                    runAsDatePath,
+                    CommonArgs(path, type, false),
                     ct
                 );
+
+                Util.FindAndWaitProcess("nextnano++_Intel_64bit", ct);
+
             } catch {
                 Util.ErrorHappend("Exception encountered in RunNn (NnAgent)!");
             }
@@ -102,8 +135,12 @@ namespace NnManager {
             try {
                 string exePath = "";
                 switch (type) {
-                    case NnType.Nn3: exePath = nn3Path; break;
-                    case NnType.NnPP: exePath = nnPPPath; break;
+                    case NnType.Nn3:
+                        exePath = nn3Path;
+                        break;
+                    case NnType.NnPP:
+                        exePath = nnPPPath;
+                        break;
                 }
 
                 string timeTotal = "", convergence = "";
@@ -116,7 +153,7 @@ namespace NnManager {
                         // timeTotal = Regex.Match(line, @"(\(.*\[h\]\))").Result("$1\n");
                         timeTotal = line + "\n";
                     else if (Regex.IsMatch(line, "OUTER-ITERATION failed to converge!!"))
-                        convergence = "OUTER-ITERATION failed to converge!!\n";
+                    convergence = "OUTER-ITERATION failed to converge!!\n";
 
                 return timeTotal + convergence;
             } catch {
@@ -141,19 +178,18 @@ namespace NnManager {
 
         public static string NnDensityFileEntry() => "density_electron";
 
-        public static (string real, string imag) NnAmplFileEntry(BandType band, int id, Spin spin) {
+        public static(string real, string imag) NnAmplFileEntry(BandType band, int id, Spin spin) {
             switch (spin) {
                 case Spin.Down:
                     return (
-                        $"wf_amplitude_real_quantum_region_{band.ToString()}_2_0000_{id.ToString("0000")}", 
+                        $"wf_amplitude_real_quantum_region_{band.ToString()}_2_0000_{id.ToString("0000")}",
                         $"wf_amplitude_imag_quantum_region_{band.ToString()}_2_0000_{id.ToString("0000")}");
                 default:
                     return (
-                        $"wf_amplitude_real_quantum_region_{band.ToString()}_1_0000_{id.ToString("0000")}", 
+                        $"wf_amplitude_real_quantum_region_{band.ToString()}_1_0000_{id.ToString("0000")}",
                         $"wf_amplitude_imag_quantum_region_{band.ToString()}_1_0000_{id.ToString("0000")}");
             }
         }
-            
 
         public static string NnProbFileEntry(BandType band, int id) =>
             $"wf_probability_quantum_region_{band.ToString()}_0000_{id.ToString("0000")}";
@@ -169,7 +205,7 @@ namespace NnManager {
 
         // FIXME: HACKING HERE! Should be generalized in future.
 
-        public static (RPath? data, RPath? coord, RPath? fld, RPath? v) GetCoordAndDat(RPath path, string entry, bool ignoreExist = false) {
+        public static(RPath? data, RPath? coord, RPath? fld, RPath? v) GetCoordAndDat(RPath path, string entry, bool ignoreExist = false) {
             RPath coord = path.SubPath(entry + ".coord");
             RPath data = path.SubPath(entry + ".dat");
             RPath fld = path.SubPath(entry + ".fld");
@@ -177,50 +213,48 @@ namespace NnManager {
 
             if (!ignoreExist)
                 if (!(
-                    File.Exists(coord) && 
-                    File.Exists(data) && 
-                    File.Exists(fld) && 
-                    File.Exists(v)
+                        File.Exists(coord) &&
+                        File.Exists(data) &&
+                        File.Exists(fld) &&
+                        File.Exists(v)
                     ))
                     return (null, null, null, null);
-            
+
             return (data, coord, fld, v);
         }
 
-        public static List<(string, string)>? ReadNXY(string content, int ny)
-        {
+        public static List < (string, string) > ? ReadNXY(string content, int ny) {
             string[] dataLines =
                 content.Splitter("[\r\n|\r|\n]+");
 
             int n = dataLines[0].Splitter("[ |\t]+").Length;
             if (ny > n - 2) return null;
 
-            var result = new List<(string, string)>();
+            var result = new List < (string, string) > ();
             foreach (int i in Enumerable.Range(1, dataLines.Count() - 1)) {
                 var data = dataLines[i].Splitter("[ |\t]+");
                 if (ny > data.Length - 2) return null;
-                
+
                 result.Add((data[0], data[ny + 1]));
             }
 
             return result;
         }
 
-        public static Dictionary<int, double>? ReadNXYIntDouble(string content, int ny)
-        {
-            var nxy = NnAgent.ReadNXY(content, ny) ?? 
+        public static Dictionary<int, double> ? ReadNXYIntDouble(string content, int ny) {
+            var nxy = NnAgent.ReadNXY(content, ny) ??
                 throw new Exception();
             if (nxy == null) return null;
 
             var result = new Dictionary<int, double>();
 
-            foreach (var (id, value) in nxy)
+            foreach (var(id, value) in nxy)
                 result[int.Parse(id)] = Double.Parse(value);
-            
+
             return result;
         }
 
-        public static Complex[,,] CoulombKernel(ScalarField refWf) {
+        public static Complex[, , ] CoulombKernel(ScalarField refWf) {
             var refer = refWf;
             int dimX = refer.Coords[Dim.X].Count;
             int dimY = refer.Coords[Dim.Y].Count;
@@ -228,29 +262,29 @@ namespace NnManager {
             var xC = refer.Coords[Dim.X].Count / 2;
             var yC = refer.Coords[Dim.Y].Count / 2;
             var zC = refer.Coords[Dim.Z].Count / 2;
-            double gX = refer.Coords[Dim.X][xC] - refer.Coords[Dim.X][xC-1];
-            double gY = refer.Coords[Dim.Y][yC] - refer.Coords[Dim.Y][yC-1];
-            double gZ = refer.Coords[Dim.Z][zC] - refer.Coords[Dim.Z][zC-1];
+            double gX = refer.Coords[Dim.X][xC] - refer.Coords[Dim.X][xC - 1];
+            double gY = refer.Coords[Dim.Y][yC] - refer.Coords[Dim.Y][yC - 1];
+            double gZ = refer.Coords[Dim.Z][zC] - refer.Coords[Dim.Z][zC - 1];
             var coulomb = new Complex[
                 dimX * 2 + 1,
                 dimY * 2 + 1,
                 dimZ * 2 + 1
             ];
             foreach (var x in Enumerable.Range(0, dimX * 2 + 1))
-            foreach (var y in Enumerable.Range(0, dimY * 2 + 1))
-            foreach (var z in Enumerable.Range(0, dimZ * 2 + 1))
-                coulomb[x, y, z] = 
-                    1.0 / Math.Sqrt(
-                        Math.Pow((x - dimX - 0.5)*gX, 2) + 
-                        Math.Pow((y - dimY - 0.5)*gY, 2) + 
-                        Math.Pow((z - dimZ - 0.5)*gZ, 2));
-            
+                foreach (var y in Enumerable.Range(0, dimY * 2 + 1))
+                    foreach (var z in Enumerable.Range(0, dimZ * 2 + 1))
+                        coulomb[x, y, z] =
+                        1.0 / Math.Sqrt(
+                            Math.Pow((x - dimX - 0.5) * gX, 2) +
+                            Math.Pow((y - dimY - 0.5) * gY, 2) +
+                            Math.Pow((z - dimZ - 0.5) * gZ, 2));
+
             // return coulomb;
-            return 
-                ScalarField.MultiplyInplace(
-                    coulomb, 
-                    ScalarField.CoulombConstant()
-                );
+            return
+            ScalarField.MultiplyInplace(
+                coulomb,
+                ScalarField.CoulombConstant()
+            );
         }
     }
 }

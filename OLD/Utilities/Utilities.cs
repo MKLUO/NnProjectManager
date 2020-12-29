@@ -73,8 +73,8 @@ namespace NnManager {
             public string? Content {
                 get {
                     if (File.Exists(path))
-                        using (StreamReader sr = new StreamReader(File.OpenRead(path)))
-                            return sr.ReadToEnd();
+                        using(StreamReader sr = new StreamReader(File.OpenRead(path)))
+                    return sr.ReadToEnd();
                     else return null;
                 }
             }
@@ -117,7 +117,7 @@ namespace NnManager {
         #region log
 
         public static CancellationTokenSource StartLogParser<Log>(RPath logFilePath, CancellationToken ct, Action<string?> status)
-            where Log : LogBase, new() {
+        where Log : LogBase, new() {
             if (!File.Exists(logFilePath))
                 File.Create(logFilePath).Close();
 
@@ -131,8 +131,8 @@ namespace NnManager {
             return tsLog;
         }
 
-        public static void LogParser<Log>(RPath logFilePath, CancellationToken ct, Action<string?> status) 
-            where Log : LogBase, new() {
+        public static void LogParser<Log>(RPath logFilePath, CancellationToken ct, Action<string?> status)
+        where Log : LogBase, new() {
             Log log = new Log();
 
             FileSystemWatcher watcher = new FileSystemWatcher();
@@ -193,6 +193,27 @@ namespace NnManager {
             }
         }
 
+        public static void FindAndWaitProcess(
+            string processName,            
+            CancellationToken ct
+        ) {
+            var processes = Process.GetProcessesByName(processName);
+
+            using(Process process = processes.OrderByDescending(p => p.StartTime).First()) {
+
+                var id = process.StartTime;
+
+                var reg = ct.Register(() => {
+                    if (!process.HasExited)
+                        process.Kill();
+                });
+
+                process.WaitForExit();
+
+                reg.Dispose();
+            }
+        }
+
         public static int seed =
             BitConverter.ToInt32(Guid.NewGuid().ToByteArray(), 0);
 
@@ -204,7 +225,7 @@ namespace NnManager {
 
             return new string(Enumerable.Repeat(chars, length)
                 .Select(s => s[random.Next(s.Length)]).ToArray());
-        }        
+        }
 
         #region hashing
 
