@@ -367,7 +367,7 @@ namespace NnManager {
             var eval = input;
             int depth = 0;
             while (eval.Contains(tokenVariable.Last())) {       
-                if (depth++ > 10) {
+                if (depth++ > 50) {
                     Util.ErrorHappend("Evaluation of derived parameter exceeds depth limit!");
                     throw new Exception();
                 }
