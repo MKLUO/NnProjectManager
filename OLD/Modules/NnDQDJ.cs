@@ -53,7 +53,7 @@ namespace NnManager {
                 return new List<double>();
 
             string result = NnDQDJGetResult();
-            string[] energies = {};
+            string[] energies = { };
 
             foreach (var line in result.Split('\n'))
                 if (line.Contains("Ensemble"))
@@ -70,7 +70,7 @@ namespace NnManager {
                 return false;
 
             options.TryGetValue("band", out string? bandStr);
-            if (!Enum.TryParse<NnAgent.BandType>(bandStr, out NnAgent.BandType band)) 
+            if (!Enum.TryParse<NnAgent.BandType>(bandStr, out NnAgent.BandType band))
                 return false;
 
             // FIXME: Can it be reduced?
@@ -627,6 +627,13 @@ namespace NnManager {
                 udduCHamReport += "\r\n";
             }
 
+            var ztIdx = oob.Count;
+            var ooEneAndTun = Enumerable.Range(0, 5).Select(idx => (hamAPdiag[idx, idx], hamAPdiag[idx, ztIdx]));
+
+            var ooEneAndTunInfo = new StringBuilder("Tunneling info: ((1, 1) orbital energies & tunnnelings to (0, 2) GS)\n");
+            foreach (var (ene, tun) in ooEneAndTun)
+                ooEneAndTunInfo.AppendLine($"{ene.Real.ToString("E04")}: {tun.Magnitude.ToString("E04")}");
+
             RPath NnDQDJApHamPath = NnDQDJPath.SubPath($"ApHam.txt");
             RPath NnDQDJApCHamPath = NnDQDJPath.SubPath($"ApCHam.txt");
             RPath NnDQDJUdduHamPath = NnDQDJPath.SubPath($"UdduHam.txt");
@@ -684,33 +691,32 @@ namespace NnManager {
                 var idxi = ddb[i].i;
                 var idxj = ddb[i].j;
                 gsDDDen += 0.5 * Math.Pow(mag.Magnitude, 2) * (denDown[idxi, idxi] + denDown[idxj, idxj]);
-            }     
+            }
 
             foreach (var i in Enumerable.Range(0, ztb.Count)) {
                 var mag = ztEigen[0].vec[i];
                 var idxi = ztb[i].i;
                 var idxj = ztb[i].j;
                 gsZTDen += 0.5 * Math.Pow(mag.Magnitude, 2) * (denUp[idxi, idxi] + denDown[idxj, idxj]);
-            }    
+            }
 
-            foreach (var (entry, field) in new [] {
-                ("AP0GSDEN", gsAP0Den),
-                ("AP1GSDEN", gsAP1Den),
-                ("DDGSDEN", gsDDDen),
-                ("ZTGSDEN", gsZTDen)
-            }) {
+            foreach (var(entry, field) in new [] {
+                    ("AP0GSDEN", gsAP0Den),
+                    ("AP1GSDEN", gsAP1Den),
+                    ("DDGSDEN", gsDDDen),
+                    ("ZTGSDEN", gsZTDen)
+                }) {
                 File.WriteAllText(
-                    NnDQDJPath.SubPath($"{entry}.fld"), 
+                    NnDQDJPath.SubPath($"{entry}.fld"),
                     ScalarField.ToNnRealFieldFldXY(field, entry));
                 File.WriteAllLines(
-                    NnDQDJPath.SubPath($"{entry}.dat"), 
+                    NnDQDJPath.SubPath($"{entry}.dat"),
                     ScalarField.ToNnRealFieldDatXYLines(
                         field, field.Coords[ScalarField.Dim.Z].Count / 2));
                 File.WriteAllLines(
-                    NnDQDJPath.SubPath($"{entry}.coord"), 
-                    ScalarField.ToNnRealFieldCoordXYLines(field));                
+                    NnDQDJPath.SubPath($"{entry}.coord"),
+                    ScalarField.ToNnRealFieldCoordXYLines(field));
             }
-
 
             ////// NOTE: J
             var J = apEigen[0].val + apEigen[1].val - uuEigen[0].val - ddEigen[0].val;
@@ -843,6 +849,8 @@ namespace NnManager {
                 oo0Info + "\n\n" +
                 ap1Info + "\n" +
                 ap0Info + "\n\n" +
+
+                ooEneAndTunInfo + "\n\n" +
 
                 ensembleGSInfo +
                 // apGSinfo + 
